@@ -7,6 +7,7 @@ sub refine_alignment { # This module aligns the sequences similarily to SATe, it
     my $path = shift @_; # path to treebuilding and treemanipulating programms
     my $dbh = PifCosm_support_subs::connect_to_database( $database );
     my $tree_method = shift @_;
+    my $save_boot_trees = shift @_;
     my $stop_criterion = shift @_;
     my $max_size = shift @_; # max size of alignment groups
     my $use_guide_tree = shift @_; # if ML tree should be used as guide tree when aligning
@@ -259,6 +260,7 @@ sub refine_alignment { # This module aligns the sequences similarily to SATe, it
             my $best_tree=<TREE>;
             close TREE or die;
             my $temp_tree="XXXguide.tree";
+	    my $boot_file='empty';
             while (1) {
                 print "Starting refinment itteration $iterations. It was $i_since_best itterations since the highest ML score.\n";
                 ++$iterations;
@@ -407,11 +409,17 @@ sub refine_alignment { # This module aligns the sequences similarily to SATe, it
                 unlink $temp_tree;
                 undef %new_seq;
                 if (-e "XXXconcatenated.phy") {
-                    ($temp_tree,$temp_ML) = PifCosm_support_subs::run_raxml("XXXconcatenated.phy", $path, "XXXtemp",$n_threads,$tree_method,$partition_file);
+		    my $n_boot;
+		    if ($tree_method=~ s/_bootstrap_([0-9]+)//) { $n_boot = $1; } # if doing bootstraps
+                    ($temp_tree,$temp_ML,$boot_file) = PifCosm_support_subs::run_raxml("XXXconcatenated.phy", $path, "XXXtemp",$n_threads,$tree_method,$partition_file,$n_boot);
                     unlink glob "XXXconcatenated.phy*";
                     unlink glob "XXXtemp.partitions.txt*";
                 }
-                else { unlink glob "XXXconcatenated.phy*"; unlink glob "XXXtemp.partitions.txt*"; die "Could not create concatenated alignment.\n"; }
+                else {
+		    unlink glob "XXXconcatenated.phy*";
+		    unlink glob "XXXtemp.partitions.txt*";
+		    die "Could not create concatenated alignment.\n";
+		}
                 if ($temp_tree eq 'empty' or !(-e $temp_tree)) {
                     die "Could not construct tree.\n";
                 }
@@ -449,6 +457,9 @@ sub refine_alignment { # This module aligns the sequences similarily to SATe, it
             if ($best_tree =~ /^\(.+\).*;/) { # save best tree
                 print "Saving tree for $linked_genes[$i] in table alignment_groups.\n";
                 #print "$best_tree\n";
+		my $method='ML';
+		if ($best_tree =~ /parsimony/) { $method = 'MP'; }
+		PifCosm_support_subs::read_tree_to_alignment_groups($best_tree,$dbh,'combined',$linked_genes[$i],$method);
                 my $string = $dbh->quote($best_tree);
                 my $updates = $dbh->do("UPDATE alignment_groups SET tree=$string WHERE taxon='combined' AND gene='$linked_genes[$i]'") or die;
                 if ( $updates != 1 ) {
@@ -456,6 +467,13 @@ sub refine_alignment { # This module aligns the sequences similarily to SATe, it
                 }
                 print "Updated $updates rows.\n";
             }
+	    if ($save_boot_trees eq 'y') {
+		if (-e $boot_file) {
+		    PifCosm_support_subs::read_tree_to_alignment_groups($boot_file,$dbh,'combined_boot',"$linked_genes[$i]_boot","ML_boot"); # save boot trees to database
+		    unlink $boot_file;
+		}
+	    }
+	    else { unlink $boot_file; }
         }
         else { die "No start tree.\n"; }
     }

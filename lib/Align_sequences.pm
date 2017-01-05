@@ -13,6 +13,7 @@ sub align_sequences {
     my $n_threads = shift @_; # store the number of threads to use, 0 means no multi threading
     my $create_tree = shift @_; # y if tree should be created, else n
     my $tree_method = shift @_; #'Light,RAx-br';
+    my $store_boot = shift @_; # if 'y' store bootstraped trees
     my $rm_outliers = shift @_; # if 'y' outliers will be removed
     my @linked_genes = @_; # array to store linked genes 
     my $dbh = PifCosm_support_subs::connect_to_database($database); #DBI->connect("dbi:SQLite:dbname=$ARGV[0]","","") or die "Couldn't connect to database: " . DBI->errstr;
@@ -197,7 +198,7 @@ sub align_sequences {
                     my $string = $dbh->quote($_);
                     $dbh->do("INSERT INTO alignment_groups (taxon,gene) VALUES ('combined',$string)") or die "Could not insert value in alignment_groups: " . $dbh->errstr; # make room for tree in database
                 }
-                &create_and_save_tree("XXXtemp.phy",$path,$dbh,$_,"combined",$n_threads,$tree_method); # create and save a tree for the gene
+                &create_and_save_tree("XXXtemp.phy",$path,$dbh,$_,"combined",$n_threads,$tree_method,$store_boot); # create and save a tree for the gene
                 if ($rm_outliers eq 'y') { &remove_outliers ($dbh, $path, $_, 'combined'); }
             }
             else { print "Faild to write a correct phylip file. Missed with $miss taxa.\n"; }
@@ -436,6 +437,7 @@ sub align_using_guide_tree {
     my $n_threads = shift @_; # number of threads to use (0 if just serial)
     my $no_guide_tree = 'n'; # flag if no guide tree was possible
     my $guide_tree = 'empty';
+    $tree_method =~ s/_bootstrap_[0-9]*//;
     ### Get sequences to make guide tree
     my $sth = $dbh->prepare("SELECT COUNT(alignments.$guide_gene\_accno),LENGTH(alignments.$guide_gene\_sequence) FROM alignments INNER JOIN gb_data ON alignments.$guide_gene\_accno=gb_data.accno WHERE alignments.$guide_gene\_sequence!='empty' AND alignments.$gene\_accno!='empty' AND (gb_data.taxon_string LIKE '%; $taxon;%' OR gb_data.taxon_string LIKE '$taxon;%' OR gb_data.taxon_string LIKE '%; $taxon' OR gb_data.taxon_string='$taxon')")
         or die "Could not prepare statement: " . $dbh->errstr;
@@ -466,7 +468,7 @@ sub align_using_guide_tree {
     open FASTAFILE, ">XXXtemp_guided.fst" or die "Could not open XXXtemp_guided.fst: $!.\n";
     my $n_guided=0; # number of sequences
     while (my @row = $sth->fetchrow_array()) {
-        push (@keep_tips,$row[0]); # get the guide acccno
+        push (@keep_tips,$row[0]); # get the guide accno
         print FASTAFILE ">$row[1]\n$row[2]\n"; # print the fasta file with sequences to align
         ++$n_guided; # count the number of sequences
     }
@@ -580,10 +582,14 @@ sub create_and_save_tree { # sub to create and save tree
     my $taxon = shift @_; # taxon that is treed
     my $n_threads = shift @_; # number of threads if pthreads, else = 0
     my $tree_method = shift @_; # what method to use to tree
+    my $store_boot = shift @_; # if 'y' store bootstrap trees
     my $tree_file; # to store tree file name
+    my $boottree_file;
+    my $n_boot;
+    if ($tree_method =~ s/_bootstrap_([0-9]+)//) { $n_boot = $1; }
     if ($tree_method =~ /(Light)|(RAx)|(fasttree)/) { # if OK method
         my $MLscore;
-        ($tree_file,$MLscore) = PifCosm_support_subs::run_raxml($phylip_file,$path,"$gene$taxon",$n_threads,$tree_method,'n'); # create tree
+        ($tree_file,$MLscore,$boottree_file) = PifCosm_support_subs::run_raxml($phylip_file,$path,"$gene$taxon",$n_threads,$tree_method,'n',$n_boot); # create tree
     }
     else {
         print "No recognized method for phylogenetic analysis.\n";
@@ -592,29 +598,41 @@ sub create_and_save_tree { # sub to create and save tree
     if ($tree_file eq 'empty') { print "Failed to create tree for $taxon, $gene.\n"; } # if no tree
     elsif ($tree_file =~ /RAxML_parsimonyTree/) { # if parsimony tree
         print "Only parsimony tree for $taxon, $gene ($tree_file), no ML tree.\n";
-        &read_tree_to_alignment_groups($tree_file,$dbh,$gene,$taxon,"Parsimony"); # save tree in database
+        PifCosm_support_subs::read_tree_to_alignment_groups($tree_file,$dbh,$gene,$taxon,"Parsimony"); # save tree in database
+	unlink $tree_file;
     }
     else { # if not parsimony it is ML
         print "Tree created for $taxon, $gene ($tree_file).\n";
-        &read_tree_to_alignment_groups($tree_file,$dbh,$gene,$taxon,"ML"); # save tree in database
+        PifCosm_support_subs::read_tree_to_alignment_groups($tree_file,$dbh,$gene,$taxon,"ML"); # save tree in database
+	unlink $tree_file;
     }
-    if ($tree_file ne 'empty') { unlink $tree_file; } # get rid of tree file
+    if ($store_boot eq 'y') {
+	if ($boottree_file ne 'empty' && -e $boottree_file) {
+	    print "Bootstraped trees created for $taxon, $gene ($boottree_file).\n";
+	    PifCosm_support_subs::read_tree_to_alignment_groups($boottree_file,$dbh,"$gene\_boot","$taxon\_boot","ML_boot"); # save trees in database
+	    unlink $boottree_file;
+	}
+	else { print "Failed to create bootstrap trees for $taxon, $gene.\n"; }
+    }
+    if ( -e $boottree_file) { unlink $boottree_file; } # get rid of boot tree file
+    if ( -e $tree_file ) { unlink $tree_file; } # get rid of tree file
 }
 
-sub read_tree_to_alignment_groups { # saves tree to database
-    my $file = shift @_; # tree file
-    my $dbh = shift @_; # database handler
-    my $gene = shift @_; # gene to save it under
-    my $taxon = shift @_; # taxon to save it under
-    my $method = shift @_; # method to annotate it with
-    open TREEFILE, "<$file" or die "Could not open tree file: $!.\n"; # open and
-    my $tree = <TREEFILE>; # read tree
-    close TREEFILE or die;
+#sub read_tree_to_alignment_groups { # saves tree to database
+#    my $file = shift @_; # tree file
+#    my $dbh = shift @_; # database handler
+#    my $gene = shift @_; # gene to save it under
+#    my $taxon = shift @_; # taxon to save it under
+#    my $method = shift @_; # method to annotate it with
+#    open TREEFILE, "<$file" or die "Could not open tree file: $!.\n"; # open and
+#    my $tree;
+#    while (my $row = <TREEFILE>) { $tree .= $row; } # read tree
+#    close TREEFILE or die;
     # uppdate database
-    my $string = $dbh->quote($tree);
-    my $update = $dbh->do("UPDATE alignment_groups SET tree=$string,tree_method='$method' WHERE gene='$gene' AND taxon='$taxon'") or die "Could not update database: " . $dbh->errstr;
-    return $update; # return how many rows were uppdated
-}
+#    my $string = $dbh->quote($tree);
+#    my $update = $dbh->do("UPDATE alignment_groups SET tree=$string,tree_method='$method' WHERE gene='$gene' AND taxon='$taxon'") or die "Could not update database: " . $dbh->errstr;
+#    return $update; # return how many rows were uppdated
+#}
 
 sub remove_outliers { # sub that remove sequences that are decendents of "extremly" long branches (outliers)
     my $dbh = shift @_; # get database handler 
@@ -636,6 +654,7 @@ sub remove_outliers { # sub that remove sequences that are decendents of "extrem
         my $cut_off = &get_outlier_length("XXXtemp_tree_file.tree", $path); # get the branchlength cut off from outliers according to gamma distribution
         my @remove_seq = `${path}treebender --cluster long_branch --cut_off $cut_off < XXXtemp_tree_file.tree`; # get groups separated by branches longer than cut-off
         my %largest_cluster; # hash to store number of taxa per cluster
+	if ($remove_seq[0] =~ /^### tree/) { shift @remove_seq; }
         for (my $i=0; $i< scalar @remove_seq; ++$i) { # for each cluster
             chomp($remove_seq[$i]); # get rid of line breaks
             $remove_seq[$i] =~ s/\s+$//; # get rid of trailing white spaces
@@ -742,7 +761,7 @@ sub dgamma { # calculate the log of the probability dencity
     my $scale = shift @_; # and scale
     my $log_lik = 0; # null log like
     foreach(@_) { # for each value
-        if (!$_ or $_ =~ /[^0-9\.eE-]/ or $_ eq '') { next;} # if it is not numerical skip it
+        if (!$_ or $_ =~ /[^0-9\.eE-]/ or $_ eq '' or $_ < 0) { next;} # if it is not numerical or negative skip it
         $log_lik += (log($_)*($shape-1))-($shape*log($scale))-log(&gamma_function($shape))-($_/$scale); # add log likelihood
     }
     return $log_lik; # return total log like

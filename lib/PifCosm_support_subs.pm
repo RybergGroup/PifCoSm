@@ -203,18 +203,21 @@ sub run_raxml { # sub to run RAxML
     my $n_threads = shift @_; # number of threads if pthreads, =0 if serial
     my @methods = split /,/, shift @_; # the methods to use
     my $partition_file = shift @_;
+    my $bootstraps = shift @_; # undef or zero if no bootstrap, else the number of bootstrap replicates
     my $ml_score;
+    #my @return_array;
+    my $ml_tree = 'empty';
     if (!$methods[0]) {
         print STDERR "No method for phylogenetic analysis given. No tree produced.\n";
-        return 'empty',$ml_score;
+        return 'empty',$ml_score,'empty';
     }
     my $additional = '';
     if ( $methods[0] eq 'RAxML' and $partition_file ne 'n') { $additional .= " -q $partition_file"; }
     my @raxml;
     unlink glob "RAxML*.$run_name*"; # remove previous files with the same name
-    if ($methods[0] eq 'ExaML') { # if runing RAxML light
+    if ($methods[0] eq 'ExaML') { # if runing ExaML
 	if ($n_threads > 0) {
-	    @raxml=`${path}raxmlHPC -y -s $phylipfile -n $run_name -m GTRGAMMA -p 12345`; # make starting tree if runing RAxML light
+	    @raxml=`${path}raxmlHPC -y -s $phylipfile -n $run_name -m GTRGAMMA -p 12345`; # make starting tree if runing EXaml
 	    #foreach (glob "*") { print "$_\n"; }
 	    if ( -e "RAxML_parsimonyTree.$run_name" ) { # if parsimony tree exists
 		rename "RAxML_parsimonyTree.$run_name","RAxML_parsimonyTree.$run_name.0";
@@ -228,13 +231,17 @@ sub run_raxml { # sub to run RAxML
 			$ml_score = $1;
 		    }
 		}
-		if ( -e "RAxML_result.$run_name" ) { # if a tree file is found
-		    unlink "RAxML_parsimonyTree.$run_name.0"; # delete parsimony tree
-		    unlink glob "RAxML_binaryCheckpoint.$run_name\_*"; # remove checkpoint files
-		    unlink "RAxML_info.$run_name"; # remove info file
-		    unlink "RAxML_log.$run_name"; # remove log file
-		    unlink "$phylipfile.reduced";
-		    return "RAxML_result.$run_name",$ml_score; # return tree file
+		if ( -e "ExaML_result.$run_name" ) { # if a tree file is found
+		    #unlink "RAxML_parsimonyTree.$run_name.0"; # delete parsimony tree
+		    #unlink glob "ExaML_binaryCheckpoint.$run_name\_*"; # remove checkpoint files
+		    #unlink "ExaML_info.$run_name"; # remove info file
+		    #unlink "ExaML_modelFile.$run_name"; # remove log file
+		    #unlink "$phylipfile.reduced";
+		    rename "ExaML_result.$run_name", "XXX_ML.$run_name.tree"; # Change name so it is easy to delete all generated files
+		    $ml_tree = "XXX_ML.$run_name.tree";
+		    #unlink (glob "RAxML_*.$run_name*");
+		    #unlink (glob "ExaML_*.$run_name*");
+		    #return "RAxML_result.$run_name",$ml_score; # return tree file
 		}
 		elsif ($methods[1] and $methods[1] eq 'RAx-br') { # if ExaML fail to produce a tree
 		    print STDERR "No ExaML tree. Doing ML on parsimony topology.\n";
@@ -246,31 +253,43 @@ sub run_raxml { # sub to run RAxML
 			    $ml_score = $1;
 			}
 		    }
-		    unlink "RAxML_binaryModelParameters.$run_name"; # remove file for model parameters
-		    unlink "$phylipfile.reduced";
+		    rename "RAxML_result.$run_name","XXX_ML.$run_name.tree";
+		    $ml_tree = "XXX_ML.$run_name.tree";
+		#    unlink glob "RAxML_*.$run_name*"; # remove file for model parameters
+		#    unlink "$phylipfile.reduced";
 		}
-		if ( -e "RAxML_result.$run_name" ) { # if tree file produced
-		    unlink "RAxML_parsimonyTree.$run_name.0"; # remove parsimony tree file
-		    unlink "RAxML_info.$run_name"; # remove info file
-		    unlink "RAxML_log.$run_name"; # remove log file
-		    unlink "$phylipfile.reduced";
-		    return "RAxML_result.$run_name",$ml_score; # return tree file
-		}
-		else { # if RAxML failed totaly return parsimony tree
+		#if ( $ml_tree eq 'empty' && -e "RAxML_result.$run_name" ) { # if tree file produced
+		#    rename "RAxML_result.$run_name", "XXX_ML.$run_name.tree";
+                #    $ml_tree = "XXX_ML.$run_name.tree";
+		    #unlink "RAxML_parsimonyTree.$run_name.0"; # remove parsimony tree file
+		    #unlink "RAxML_info.$run_name"; # remove info file
+		    #unlink "RAxML_log.$run_name"; # remove log file
+		#    unlink "RAxML_*.$run_name*";
+		#    unlink "$phylipfile.reduced";
+		    #return "RAxML_result.$run_name",$ml_score; # return tree file
+		#}
+		#else
+	       if ($ml_tree eq 'empty') { # if RAxML failed totaly return parsimony tree
 		    print STDERR "No ML tree, returning parsimony tree.\n";
 		    foreach (@raxml) { print $_; }
-		    return "RAxML_parsimonyTree.$run_name.0",$ml_score;
+		    #return "RAxML_parsimonyTree.$run_name.0",$ml_score;
+		    rename "RAxML_parsimonyTree.$run_name.0","XXXparsimony.$run_name.tree";
+		    $ml_tree = "XXXparsimony.$run_name.tree";
+		    #unlink "RAxML_*.$run_name*";
 		}
+		unlink "$phylipfile.reduced";
+		unlink (glob "RAxML_*.$run_name*");
+	    	unlink (glob "ExaML_*.$run_name*");
 	    }
 	    else {
 		print STDERR "No starting tree generated for ExaML.\n";
 		foreach (@raxml) { print $_; }
-		return 'empty',$ml_score; # if no parsimony tree return empty
+		#return 'empty',$ml_score; # if no parsimony tree return empty
 	    }
 	}
 	else {
 	    print STDERR "Examl requires multiple cores.\n";
-	    return 'empty',$ml_score; # if numbers of threads not given return empty
+	    #return 'empty',$ml_score; # if numbers of threads not given return empty
 	}
     }
     elsif ($methods[0] eq 'RAxML') {
@@ -282,19 +301,22 @@ sub run_raxml { # sub to run RAxML
             }
         }
         if ( -e "RAxML_result.$run_name" ) { # if tree file produced
-            unlink "RAxML_info.$run_name"; # remove info file
-            unlink "RAxML_log.$run_name"; # remove log file
+	    rename "RAxML_result.$run_name", "XXX_ML.$run_name.tree";
+	    $ml_tree = "XXX_ML.$run_name.tree";
+	    unlink "RAxML_*.$run_name*";
+            #unlink "RAxML_info.$run_name"; # remove info file
+            #unlink "RAxML_log.$run_name"; # remove log file
             unlink "$phylipfile.reduced";
-            return "RAxML_result.$run_name",$ml_score; # return tree file
+            #return "RAxML_result.$run_name",$ml_score; # return tree file
         }
         else {
             print STDERR "No tree generated.\n";
             foreach (@raxml) { print $_; }
-            return 'empty',$ml_score;
+            #return 'empty',$ml_score;
         }
     }
     elsif ($methods[0] eq 'fasttree') {
-        system "${path}FastTree -quiet -nt -gtr -gamma -log XXXlogfile.txt < $phylipfile > $run_name.tree";
+        system "${path}FastTree -quiet -nt -gtr -gamma -log XXXlogfile.txt < $phylipfile > XXX_ML.$run_name.tree";
         if (-e "XXXlogfile.txt") {
             open LOGFILE, "<XXXlogfile.txt" or die "Could not open logfile.\n";
             while (my $row=<LOGFILE>) {
@@ -305,16 +327,68 @@ sub run_raxml { # sub to run RAxML
             close LOGFILE or die;
             unlink "XXXlogfile.txt";
         }
-        if (-e "$run_name.tree") { return "$run_name.tree",$ml_score; }
+        if (-e "XXX_ML.$run_name.tree") { $ml_tree = "XXX_ML.$run_name.tree"; }
         else {
             print STDERR "No tree generated.\n";
-            return 'empty',$ml_score;
+            #return 'empty',$ml_score;
         }
     }
     else {
         print STDERR "No recognized method for the phylogenetic analysis given. No tree produced.\n";
-        return 'empty',$ml_score;
+        return 'empty',$ml_score,'empty';
     }
+############################
+# save ML tree in $ml_tree
+    my $boottree_file = 'empty';
+    if ($bootstraps) {
+	print "Performing bootstrap analysis.\n";
+	if ($methods[0] eq 'RAxML' or $methods[0] eq 'ExaML') {
+	    unlink glob "RAxML*.XXXtemp";
+	    if ($partition_file eq 'n') {
+		if ($n_threads > 1) {
+		    my @raxml = `${path}raxmlHPC-PTHREADS -x 12345 -p 54321 -# $bootstraps -m GTRGAMMA -s $phylipfile -n XXXtemp -T $n_threads`;
+		    if ($ml_tree ne 'empty' and -e $ml_tree) { @raxml = `${path}raxmlHPC-PTHREADS -f b -t $ml_tree -z RAxML_bootstrap.XXXtemp -m GTRGAMMA -n XXXbipart`; }
+		    else { print STDERR "No ML tree for $run_name to draw support values on for $run_name.\n"; }
+		}
+		else {
+		    my @raxml = `${path}raxmlHPC -x 12345 -p 54321 -# $bootstraps -m GTRGAMMA -s $phylipfile -n XXXtemp`;
+		    if ($ml_tree ne 'empty' and -e $ml_tree) { @raxml = `${path}raxmlHPC -f b -t $ml_tree -z RAxML_bootstrap.XXXtemp -m GTRGAMMA -n XXXbipart`; }
+		    else { print STDERR "No ML tree for $run_name to draw support values on for $run_name.\n"; }
+		}
+	    }
+	    else {
+		if ($n_threads > 1) {
+		    my @raxml = `${path}raxmlHPC-PTHREADS -x 12345 -p 54321 -# $bootstraps -m GTRGAMMA -s $phylipfile -q $partition_file -n XXXtemp -T $n_threads`;
+		    if ($ml_tree ne 'empty' and -e $ml_tree) { @raxml = `${path}raxmlHPC-PTHREADS -f b -t $ml_tree -z RAxML_bootstrap.XXXtemp -m GTRGAMMA -n XXXbipart -T $n_threads`; }
+		    else { print STDERR "No ML tree for $run_name to draw support values on for $run_name.\n"; }
+		}
+		else {
+		    my @raxml = `${path}raxmlHPC -x 12345 -p 54321 -# $bootstraps -m GTRGAMMA -s $phylipfile -q $partition_file -n XXXtemp`;
+		    if ($ml_tree ne 'empty' and -e $ml_tree) { @raxml = `${path}raxmlHPC -f b -t $ml_tree -z RAxML_bootstrap.XXXtemp -m GTRGAMMA -n XXXbipart`; }
+		    else { print STDERR "No ML tree for $run_name to draw support values on for $run_name.\n"; }
+		}
+	    }
+	    if (-e "RAxML_bipartitions.XXXbipart") {
+		if (!$ml_tree) { $ml_tree = 'XXX_ML.tree'; }
+		rename "RAxML_bipartitions.XXXbipart",$ml_tree;
+	    }
+	    unlink "$phylipfile.reduced";
+	    if (-e 'RAxML_bootstrap.XXXtemp') {
+		rename 'RAxML_bootstrap.XXXtemp', "XXX_boot.$run_name.trees";
+		$boottree_file = "XXX_boot.$run_name.trees";
+	    }
+	    unlink glob "RAxML*.XXXtemp";
+	    unlink glob "RAxML*.XXXbipart"
+	}
+	elsif ($methods[0] eq 'fasttree') {
+	    system "${path}FastTree -quiet -nt -gtr -gamma -noml -boot $bootstraps -intree $ml_tree < $phylipfile > XXXtemp.tree";
+	    rename "XXXtemp.tree","XXX_ML.$run_name.tree";
+	    $ml_tree = "XXX_ML.$run_name.tree";
+	}
+	else { print STDERR "Did not recognize method for bootstrap analysis. No bootstrap support generated.\n"; }
+    }
+#############################
+    return $ml_tree,$ml_score,$boottree_file;
 }
 
 # Print a relaxed phylip file (argument 1) from database. Need a prepared statement (argument 2) with accno in the first column and
@@ -1104,6 +1178,35 @@ sub newick_to_mafft {
    }
    return $mafft_tree;
 }
+
+sub read_tree_to_alignment_groups { # saves tree to database
+    my $file = shift @_; # tree file
+    my $dbh = shift @_; # database handler
+    my $gene = shift @_; # gene to save it under
+    my $taxon = shift @_; # taxon to save it under
+    my $method = shift @_; # method to annotate it with
+    open TREEFILE, "<$file" or die "Could not open tree file $file: $!.\n"; # open and
+    my $tree='';
+    while (my $row = <TREEFILE>) { $tree .= $row; } # read tree
+    close TREEFILE or die;
+    # check if entry for taxon and gene is present
+    my $sth = $dbh->prepare ("SELECT COUNT(taxon) FROM alignment_groups WHERE taxon='$taxon' AND gene='$gene'") or die;
+    $sth->execute();
+    my $count = $sth->fetchrow_array();
+    $sth->finish();
+    # uppdate database
+    my $string = $dbh->quote($tree);
+    #print STDERR "Tree to save from $file (method: $method, gene: $gene, and taxon: $taxon):\n$string\n";
+    if ($count and $count >= 1) {
+	my $update = $dbh->do("UPDATE alignment_groups SET tree=$string,tree_method='$method' WHERE gene='$gene' AND taxon='$taxon'") or die "Could not update database: " . $dbh->errstr;
+	return $update; # return how many rows were uppdated
+    }
+    else {
+	my $update = $dbh->do("INSERT INTO alignment_groups (taxon,gene,tree,alignable) VALUES ('$taxon','$gene',$string,2)") or die "Could not insert value in alignment_groups: " . $dbh->errstr;
+	return $update; # return how many rows were inserted
+    }
+}
+
 
 sub process_cluster_array { # this should be moved to Support functions and be implemented in the tree clustering as well
     my $dbh = shift @_;

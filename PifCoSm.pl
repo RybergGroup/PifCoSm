@@ -193,7 +193,7 @@ my $stats_type = 'alignment';
         elsif ($ARGV[$i] eq "-p" or $ARGV[$i] eq "--phylo_method") {
             if (($i+1) < scalar @ARGV and !($ARGV[$i+1] =~ /^-/)) { $tree_method = $ARGV[++$i]; }
         }
-        elsif ($ARGV[$i] eq "-c" or $ARGV[$i] eq "--cat_phylo_method") {
+        elsif ($ARGV[$i] eq "-c" or $ARGV[$i] eq "--concat_phylo_method") {
             if (($i+1) < scalar @ARGV and !($ARGV[$i+1] =~ /^-/)) { $final_tree_method = $ARGV[++$i]; }
         }
         elsif ($ARGV[$i] eq "-r" or $ARGV[$i] eq "--stop_criterion") {
@@ -557,13 +557,17 @@ my $stats_type = 'alignment';
                     if ($modules[$i] eq "align_sequences") {
                         $run_module{"align_sequences"} = 'y';
                         if ($n_threads =~ /[^0-9]/g) { die "$n_threads is a invalid value for the numberof threads (-T/--threads).\n"; }
-                        if (!($tree_method eq "ExaML" or $tree_method eq "ExaML,RAx-br" or $tree_method eq "RAxML" or $tree_method eq "fasttree")) { die "$tree_method is not a recognized phylogenetic method (-p/--phylo_method).\n"; }
+                        if (!($store_boot_trees eq 'y' or $store_boot_trees eq 'n')) { die "$store_boot_trees is not a valid option for if bootstrap trees should be stored or not.\n"; }
+			my $test_method = $tree_method;
+			$test_method =~ s/_bootstrap_[0-9]*//;
+                        if (!($test_method eq "ExaML" or $test_method eq "ExaML,RAx-br" or $test_method eq "RAxML" or $test_method eq "fasttree")) { die "$tree_method is not a recognized phylogenetic method (-p/--phylo_method).\n"; }
                         if ($rm_outliers eq 'y' and $create_gene_tree eq 'n') { die "Must create gene trees (-E/--create_gene_trees set to yes) to define which outliers to remove (-Y/--remove_outliers).\n"; }
                         foreach (@linked_genes) { if ($_ =~ /[^a-zA-Z0-9_;]/) { die "The linked gene annotation $_ contain illegal characters.\n"; }}
                     }
                     elsif ($modules[$i] eq "refine_alignments") {
                         $run_module{"refine_alignments"} = 'y';
                         if ($n_threads =~ /[^0-9]/g) { die "$n_threads is a invalid value for the numberof threads (-T/--threads).\n"; }
+                        if (!($store_boot_trees eq 'y' or $store_boot_trees eq 'n')) { die "$store_boot_trees is not a valid option for if bootstrap trees should be stored or not.\n"; }
                         if (!($tree_method eq "ExaML" or $tree_method eq "ExaML,RAx-br" or $tree_method eq "RAxML" or $tree_method eq "fasttree")) { die "$tree_method is not a recognized phylogenetic method (-p/--phylo_method).\n"; }
                         foreach (@linked_genes) { if ($_ =~ /[^a-zA-Z0-9_;]/) { die "The linked gene annotation $_ contain illegal characters.\n"; }}
                         if (!($stop_criterion =~ /^iterations_[0-9]+/ or $stop_criterion =~ /^max_[0-9]+/)) { die "$stop_criterion is not a valid stop criterion when refining the alignments (-r/--stop_criterion).\n"; }
@@ -599,7 +603,7 @@ my $stats_type = 'alignment';
                     }
                     elsif ($modules[$i] eq "concatenated_tree") {
                         $run_module{"concatenated_tree"} = 'y';
-                        if (!($final_tree_method =~ /(ExaML)|(ExaML,RAx-br)|(RAxML)|(fasttree)/i)) {die "Could not find viable phylogenetic method in '$final_tree_method', give other method (-c/--cat_phylo_method).\n"; }
+                        if (!($final_tree_method =~ /(ExaML)|(ExaML,RAx-br)|(RAxML)|(fasttree)/i)) {die "Could not find viable phylogenetic method in '$final_tree_method', give other method (-c/--concat_phylo_method).\n"; }
                         if ($n_threads =~ /[^0-9]/g) { die "$n_threads is a invalid value for the numberof threads (-T/--threads).\n"; }
                         if (!($store_boot_trees eq 'y' or $store_boot_trees eq 'n')) { die "$store_boot_trees is not a valid option for if bootstrap trees should be stored or not.\n"; }
                         if (!($gene_alignments[0] eq 'all' or $gene_alignments[0] =~ /^max_block_[0-9]+/)) {
@@ -750,7 +754,7 @@ for (my $i=0; $i < scalar @modules; ++$i) {
             print "Database backed up in file: $backup_name\n"
         }
     }
-    if ($modules[$i] eq "check_taxonomy") {
+    elsif ($modules[$i] eq "check_taxonomy") {
         &print_module_title ("Checking if taxonomy in field taxon_string in gb_data is consistent.");
 	PifCosm_support_subs::check_taxon_string_consistency($database, 'environmental samples;mycorrhizal samples', 'r');
         if ($backup{"check_taxonomy"} or $backup{"all"}) {
@@ -948,7 +952,7 @@ for (my $i=0; $i < scalar @modules; ++$i) {
     }
     elsif ($modules[$i] eq "align_sequences") {
         &print_module_title ("Starting aligning and creating trees.");
-        Align_sequences::align_sequences($database, $path, $n_threads, $create_gene_tree, $tree_method, $rm_outliers, @linked_genes);
+        Align_sequences::align_sequences($database, $path, $n_threads, $create_gene_tree, $tree_method, $store_boot_trees, $rm_outliers, @linked_genes);
         if ($backup{"align_sequences"} or $backup{"all"}) {
             my $backup_name = $database . ".align";
             my $counter = 0;
@@ -974,7 +978,7 @@ for (my $i=0; $i < scalar @modules; ++$i) {
             @genes = PifCosm_support_subs::find_lardgest_block($database, $1);
         }
         else { @genes = @gene_alignments; }
-        Refine_alignment::refine_alignment ( $database, $path, $tree_method, $stop_criterion, $max_size, $use_guide_tree, $n_threads, join (',',@genes), join (',',@linked_genes));
+        Refine_alignment::refine_alignment ( $database, $path, $tree_method, $store_boot_trees, $stop_criterion, $max_size, $use_guide_tree, $n_threads, join (',',@genes), join (',',@linked_genes));
         if ($backup{"refine_alignments"} or $backup{"all"}) {
             my $backup_name = $database . ".refine";
             my $counter = 0;
@@ -1022,7 +1026,7 @@ for (my $i=0; $i < scalar @modules; ++$i) {
         else { @genes = @gene_alignments; }
         Concatenated_tree::concatenated_tree ($database, $path, $final_tree_method, $n_threads, $store_boot_trees, $anchor_gene, @genes); # make a tree from concatenated alignment
         if ($backup{"concatenated_tree"} or $backup{"all"}) {
-            my $backup_name = $database . ".cat_tree";
+            my $backup_name = $database . ".concat_tree";
             my $counter = 0;
             while (-e $backup_name) {
                 $backup_name =~ s/_[0-9]*$//;
@@ -1198,7 +1202,7 @@ sub pars_batch_file {
         elsif ($infile =~ /^\s*phylo_method\s+([\w,-]+)/i) {
             $tree_method = $1;
         }
-        elsif ($infile =~ /^\s*cat_phylo_method\s+([\w,-]+)/i) {
+        elsif ($infile =~ /^\s*concat_phylo_method\s+([\w,-]+)/i) {
             $final_tree_method = $1;
         }
         elsif ($infile =~ /^\s*max_alignment_group_size\s+(\w+)/i) {
@@ -1400,7 +1404,7 @@ sub print_batch_file_sub {
     if ($remove_from_trees) { print BATCHFILE "rm_rogues_from_ml_tree $remove_from_trees\n"; }
     if ($remove_from_alignment) { print BATCHFILE "rm_rogues_from_alignment $remove_from_alignment\n"; }
     if ($remove_entries) { print BATCHFILE "remove_entries $remove_entries"; }
-    if ($final_tree_method) { print BATCHFILE "cat_phylo_method $final_tree_method\n"; }
+    if ($final_tree_method) { print BATCHFILE "concat_phylo_method $final_tree_method\n"; }
     if ($max_size) { print BATCHFILE "max_alignment_group_size $max_size\n"; }
     if ($use_guide_tree) { print BATCHFILE "use_guide_tree $use_guide_tree\n"; }
     if ($stop_criterion) { print BATCHFILE "stop_criterion $stop_criterion\n"; }
