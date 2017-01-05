@@ -51,7 +51,6 @@ sub concatenated_tree { # create a tree for the concatenated genes
     elsif ($final_tree_method =~ /fasttree/i) { $method = 'fasttree'; $interleaved = 'y'; }
     else { die "Did not recognize any method for getting ML tree.\n"; }
     my $n_boot;
-    my $boottrees_file;
     if ($final_tree_method =~ /_bootstrap_([0-9]+)/) {
  	$n_boot = $1;
     }
