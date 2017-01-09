@@ -1128,7 +1128,7 @@ sub pars_batch_file {
         if ($infile =~ /^\s*database\s+([\w\.]+)/i) {
             $database = $1;
         }
-        elsif ($infile =~ /^\s*gb_file\s+([\w\.]+)/i) {
+        elsif ($infile =~ /^\s*gb_file\s+([\/\\\w\.]+)/i) {
             $gb_data_file = $1;
         }
         elsif ($infile =~ /^\s*modules\s+([\w,]+)/i) {
