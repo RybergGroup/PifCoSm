@@ -24,12 +24,12 @@ sub astral_tree {
 	    my $tree = $sth->fetchrow_array(); # get tree, if several get first
 	    if ($tree) { # if tree found
 		if ($i==0) { # if first tree get tip labels
-		    open $TREEBENDER, "| treebender -t \",\n\" > XXXkeep_tips.txt";
+		    open $TREEBENDER, "| $External_program::treebender -t \",\n\" > XXXkeep_tips.txt";
 		    print $TREEBENDER $tree;
 		    close $TREEBENDER;
 		}
 		else { # if previous trees parsed, get tip labels that are also in those trees
-		    open $TREEBENDER, "| treebender -d file:XXXkeep_tips.txt -i | treebender -t \",\n\" > XXXtemp.txt";
+		    open $TREEBENDER, "| $External_program::treebender -d file:XXXkeep_tips.txt -i | $External_program::treebender -t \",\n\" > XXXtemp.txt";
 		    print $TREEBENDER $tree;
 		    close $TREEBENDER;
 		    move "XXXtemp.txt","XXXkeep_tips.txt";
@@ -40,7 +40,7 @@ sub astral_tree {
     ###########
     unlink "XXXtreesForAstral.trees"; # Clear tree file
     if ($anchor_gene ne 'n') { # If anchor genes given prepare to remove tips not in anchor gene trees
-	open $TREEBENDER, "| treebender -d file:XXXkeep_tips.txt -i >> XXXtreesForAstral.trees";
+	open $TREEBENDER, "| $External_program::treebender -d file:XXXkeep_tips.txt -i >> XXXtreesForAstral.trees";
     }
     else { # Otherwise prepare to save trees as is
 	open $TREEBENDER, '>>', "XXXtreesForAstral.trees" or die "Could not open XXXtreesForAstral.trees: $!.\n";

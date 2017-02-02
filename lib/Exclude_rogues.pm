@@ -17,7 +17,7 @@ sub exclude_rogues {
     print BOOTTREE $sth->fetchrow_array();
     close BOOTTREE or die;
     unlink glob "*.XXXtempRogue";
-    my $RogueNaRok = `${path}RogueNaRok -i XXXboot.trees -n XXXtempRogue`;
+    my $RogueNaRok = `${path}$External_program::RogueNaRok -i XXXboot.trees -n XXXtempRogue`;
     undef $RogueNaRok;
     unlink "XXXboot.trees";
     open ROGUES, "<RogueNaRok_droppedRogues.XXXtempRogue" or die "Could not open temporary file RogueNaRok_droppedRogues.XXXtempRogue: $!.\n";
@@ -55,7 +55,7 @@ sub exclude_rogues {
             print MLTREE $sth->fetchrow_array();
             $sth->finish();
             close MLTREE or die;
-            system "${path}treebender -d $drop_tips < XXXml.tree > XXXml.norogue.tree";
+            system "${path}$External_program::treebender -d $drop_tips < XXXml.tree > XXXml.norogue.tree";
             unlink "XXXml.tree";
             $sth = $dbh->prepare("SELECT tree FROM alignment_groups WHERE taxon='combined_boot' AND gene='combined_boot'") or die;
             $sth->execute();
@@ -64,12 +64,12 @@ sub exclude_rogues {
             foreach (@boot_trees) {
                 open BOOTTREE, ">XXXtemp.trees" or die "Could not open temporary file XXXboot.trees: $!.\n";
                 print BOOTTREE $_;
-                system "${path}treebender -d $drop_tips < XXXtemp.trees >> XXXboot.trees";
+                system "${path}$External_program::treebender -d $drop_tips < XXXtemp.trees >> XXXboot.trees";
                 close BOOTTREE or die;
             }
             unlink "XXXtemp.trees";
             unlink glob "*.XXXsupport";
-            my $raxml = `${path}raxmlHPC -f b -t XXXml.norogue.tree -z XXXboot.trees -m GTRGAMMA -n XXXsupport`;
+            my $raxml = `${path}$External_program::raxml -f b -t XXXml.norogue.tree -z XXXboot.trees -m GTRGAMMA -n XXXsupport`;
             undef $raxml;
             unlink glob "XXXschematic.alignment*";
             unlink "XXXml.norogue.tree";

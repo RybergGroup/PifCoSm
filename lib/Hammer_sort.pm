@@ -286,7 +286,7 @@ sub runhammer { # takes "sequence name (not starting with >", sequence, and hmm 
     close QUERYFILE or die;
 
     # Start HMMER search and read output
-    my @hmmoutput = `${path}hmmscan -E $e_value_cut_off $hmmdatabase query.fst`;
+    my @hmmoutput = `${path}$External_program::hmmscan -E $e_value_cut_off $hmmdatabase query.fst`;
     unlink "query.fst" or die; # remove query sequence file
     if (!($hmmoutput[0] =~ /hmmscan :: search sequence/)) { die "Error in execution of hmmscan\n"; }
 

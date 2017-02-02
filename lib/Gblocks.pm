@@ -24,7 +24,7 @@ sub Gblocks {
        my $sth = $dbh->prepare("SELECT $_\_accno,$_\_sequence FROM alignments WHERE $_\_sequence != 'empty'") or die;
        my $n_seq = PifCosm_support_subs::print_fasta("XXXalignment.fst",$sth);
        $sth->finish();
-       if (!$n_seq || $n_seq < 1) { print "No sequences for $_. Ignoring it.\n"; next; }
+       if (!$n_seq || $n_seq < 2) { print "Less than two sequences for $_. Ignoring it.\n"; unlink "XXXalignment.fst"; next; }
        my $switches ='';
        if ($b0 > 2) { $switches .= " -b0=$b0"; }
        if ($b1 > 0) { $switches .= " -b1=$b1"; }
@@ -32,7 +32,7 @@ sub Gblocks {
        if ($b3 > 0) { $switches .= " -b3=$b3"; }
        if ($b4 > 1) { $switches .= " -b4=$b4"; }
        if ($b5 eq 'n' or $b5 eq 'h' or $b5 eq 'a') { $switches .= " -b5=$b5"; }
-       my @gblocks = `${path}Gblocks XXXalignment.fst -t=d$switches`;
+       my @gblocks = `${path}$External_program::gblocks XXXalignment.fst -t=d$switches`;
        PifCosm_support_subs::read_fasta_to_alignments_table ("XXXalignment.fst-gb",$dbh,$_,'accno');
        unlink glob "XXXalignment.fst*";
        $sth = $dbh->prepare("SELECT $_\_accno,$_\_sequence FROM alignments WHERE $_\_sequence != 'empty'") or die;

@@ -153,9 +153,9 @@ sub align_sequences {
                     if ($n_threads > 0) { # if using threads
                         my $threads = $n_threads;
                         if ($n_threads > 1) { --$threads; } # only give extra threads
-                            system "${path}mafft --quiet --thread $threads --add XXXsingletons.fst XXXaligned_$_.fst > XXXtemp_temp.fst"; # align
+                            system "${path}$External_program::mafft --quiet --thread $threads --add XXXsingletons.fst XXXaligned_$_.fst > XXXtemp_temp.fst"; # align
                     }
-                    else { system "${path}mafft --quiet --add XXXsingletons.fst XXXaligned_$_.fst > XXXtemp_temp.fst"; } # in no threads align ordinarily
+                    else { system "${path}$External_program::mafft --quiet --add XXXsingletons.fst XXXaligned_$_.fst > XXXtemp_temp.fst"; } # in no threads align ordinarily
                     unlink ("XXXsingletons.fst","XXXaligned_$_.fst");
                     if (-e "XXXtemp_temp.fst") {
                         my ($ntaxa,$seqlength) = PifCosm_support_subs::read_fasta_to_alignments_table("XXXtemp_temp.fst",$dbh,$_,'accno'); # read alignment to database
@@ -258,7 +258,7 @@ sub merge_alignments_according_to_tree {
                     }
                     elsif (-e "XXX$gene$keys[$i].fst") { # otherwise add the taxon to the merging file
                         #system "${path}mafft --addprofile XXX$gene$keys[$i].fst XXXbuild.fst > XXXtemp_temp.fst"; # add sequences to previous alignment
-                        system "${path}muscle -quiet -profile -in1 XXXbuild.fst -in2 XXX$gene$keys[$i].fst -out XXXtemp_temp.fst"; # add sequences to previous alignment
+                        system "${path}$External_program::muscle -quiet -profile -in1 XXXbuild.fst -in2 XXX$gene$keys[$i].fst -out XXXtemp_temp.fst"; # add sequences to previous alignment
                         rename "XXXtemp_temp.fst", "XXXbuild.fst";
                         unlink "XXX$gene$keys[$i].fst";
                     }
@@ -273,9 +273,9 @@ sub merge_alignments_according_to_tree {
                         if ($n_threads > 0) { # if using threads
                             my $threads = $n_threads;
                             if ($n_threads > 1) { --$threads; } # only give extra threads
-                                system "${path}mafft --quiet --thread $threads --add XXX${gene}_singletons.fst XXXbuild.fst > XXXtemp_temp.fst"; # align
+                                system "${path}$External_program::mafft --quiet --thread $threads --add XXX${gene}_singletons.fst XXXbuild.fst > XXXtemp_temp.fst"; # align
                         }
-                        else { system "${path}mafft --quiet --add XXX${gene}_singletons.fst XXXbuild.fst > XXXtemp_temp.fst"; } # in no threads align ordinarily
+                        else { system "${path}$External_program::mafft --quiet --add XXX${gene}_singletons.fst XXXbuild.fst > XXXtemp_temp.fst"; } # in no threads align ordinarily
                         rename "XXXtemp_temp.fst","XXXbuild.fst"; # move new alignment to the file buing built on
                     }
                     else {
@@ -285,11 +285,11 @@ sub merge_alignments_according_to_tree {
                                 my $threads = $n_threads;
                                 if ($n_threads > 1) { --$threads; }
                                 print "Using mafft, pthread version.\n";
-                                system "${path}mafft --auto --quiet --thread $threads XXX${gene}_singletons.fst > XXXbuild.fst";
+                                system "${path}$External_program::mafft --auto --quiet --thread $threads XXX${gene}_singletons.fst > XXXbuild.fst";
                             }
                             else {
                                 print "Using mafft, serial version.\n";
-                                system "${path}mafft --auto --quiet XXX${gene}_singletons.fst > XXXbuild.fst";
+                                system "${path}$External_program::mafft --auto --quiet XXX${gene}_singletons.fst > XXXbuild.fst";
                             }
                         }
                     }
@@ -310,11 +310,11 @@ sub merge_alignments_according_to_tree {
                             my $threads = $n_threads;
                             if ($n_threads > 1) { --$threads; }
                             print "Using mafft, pthread version.\n";
-                            system "${path}mafft --auto --quiet --thread $threads XXX${gene}$parent_no_space.fst > XXXbuild.fst";
+                            system "${path}$External_program::mafft --auto --quiet --thread $threads XXX${gene}$parent_no_space.fst > XXXbuild.fst";
                         }
                         else {
                             print "Using mafft, serial version.\n";
-                            system "${path}mafft --auto --quiet XXX${gene}$parent_no_space.fst > XXXbuild.fst";
+                            system "${path}$External_program::mafft --auto --quiet XXX${gene}$parent_no_space.fst > XXXbuild.fst";
                         }
                         unlink "XXX${gene}$parent_no_space.fst";
                     }
@@ -413,11 +413,11 @@ sub align {
         my $threads = $n_threads;
         if ($n_threads > 1) { --$threads; } # mafft need one thread to coordinate the others
         print "Aligning $n_taxa sequences using mafft, pthread version.\n";
-        system "${path}mafft --auto --quiet --thread $threads XXXtemp_fastafile.fst > XXXtemp_aligned.fst"; # align
+        system "${path}$External_program::mafft --auto --quiet --thread $threads XXXtemp_fastafile.fst > XXXtemp_aligned.fst"; # align
     }
     else { # if not multi-threads
         print "Aligning $n_taxa sequences using mafft.\n";
-        system "${path}mafft --auto --quiet XXXtemp_fastafile.fst > XXXtemp_aligned.fst"; # align
+        system "${path}$External_program::mafft --auto --quiet XXXtemp_fastafile.fst > XXXtemp_aligned.fst"; # align
     }
     unlink "XXXtemp_fastafile.fst"; # remove file with unaligned sequences
     print "Reading aligned sequences to database.\n";
@@ -489,7 +489,7 @@ sub align_using_guide_tree {
         else { $bender_string = "'$keep_tips[$j]|$order"; } # if first accno
     }
     $bender_string .= "'"; # end benderstring with '
-    open TREEBENDER, "${path}treebender -c $bender_string < $guide_tree |"; # pipe tree into perl
+    open TREEBENDER, "${path}$External_program::treebender -c $bender_string < $guide_tree |"; # pipe tree into perl
     $guide_tree = <TREEBENDER>; # get tree
     close TREEBENDER or die "Could not close treebender properly: $!";
     my ($scale,$comparisons) = PifCosm_support_subs::comp_distance($dbh,$path,$guide_gene, $gene, $taxon, 10); # find value to rescale branch lengths
@@ -505,14 +505,14 @@ sub align_using_guide_tree {
     print TREEFILE $guide_tree; # print mafft guide tree
     close TREEFILE or die;
     print "Aligning sequences present in guide tree.\n";
-    system "${path}mafft --auto --quiet --treein XXXtemp_mafft.tree XXXtemp_guided.fst > XXXtemp.aligned.fst"; # align sequences using guide tree
+    system "${path}$External_program::mafft --auto --quiet --treein XXXtemp_mafft.tree XXXtemp_guided.fst > XXXtemp.aligned.fst"; # align sequences using guide tree
     print "Getting sequences not in guide tree.\n";
     # get sequences that did not overlap with the guide gene
     $sth = $dbh->prepare("SELECT $gene.accno,$gene.sequence FROM $gene INNER JOIN alignments ON $gene.accno=alignments.$gene\_accno INNER JOIN gb_data ON $gene.accno=gb_data.accno WHERE alignments.$guide_gene\_sequence='empty' AND (gb_data.taxon_string LIKE '%; $taxon;%' OR gb_data.taxon_string LIKE '$taxon;%' OR gb_data.taxon_string LIKE '%; $taxon' OR gb_data.taxon_string='$taxon')")
         or die "Could not prepare statement: " . $dbh->errstr;
     my $n_added = PifCosm_support_subs::print_fasta("XXXtemp.fst",$sth); # print them to fasta file
     print "Aligning sequences to guided alignment.\n";
-    system "${path}mafft --auto --quiet --add XXXtemp.fst XXXtemp.aligned.fst > XXXtemp_all.fst"; # add them to alignment using mafft
+    system "${path}$External_program::mafft --auto --quiet --add XXXtemp.fst XXXtemp.aligned.fst > XXXtemp_all.fst"; # add them to alignment using mafft
     print "Reading aligned sequences to database.\n";
     my ($ntaxa,$seqlength) = PifCosm_support_subs::read_fasta_to_alignments_table("XXXtemp_all.fst",$dbh,$gene,'accno'); # read the aligned sequences to the database
     if ($ntaxa != $n_guided+$n_added) { # if it doesn't add up
@@ -652,7 +652,7 @@ sub remove_outliers { # sub that remove sequences that are decendents of "extrem
         print TREEFILE $tree; #print tree to file
         close TREEFILE or die;
         my $cut_off = &get_outlier_length("XXXtemp_tree_file.tree", $path); # get the branchlength cut off from outliers according to gamma distribution
-        my @remove_seq = `${path}treebender --cluster long_branch --cut_off $cut_off < XXXtemp_tree_file.tree`; # get groups separated by branches longer than cut-off
+        my @remove_seq = `${path}$External_program::treebender --cluster long_branch --cut_off $cut_off < XXXtemp_tree_file.tree`; # get groups separated by branches longer than cut-off
         my %largest_cluster; # hash to store number of taxa per cluster
 	if ($remove_seq[0] =~ /^### tree/) { shift @remove_seq; }
         for (my $i=0; $i< scalar @remove_seq; ++$i) { # for each cluster
@@ -679,7 +679,7 @@ sub remove_outliers { # sub that remove sequences that are decendents of "extrem
                 $changes_accnos += PifCosm_support_subs::remove_accno_from_alignments($dbh,$gene,$_);
                 print " $_...";
             } # remove each accno from the alignments table
-            $tree = `${path}treebender -d '$drop_tips' < XXXtemp_tree_file.tree`; # remove sequences from tree
+            $tree = `${path}$External_program::treebender -d '$drop_tips' < XXXtemp_tree_file.tree`; # remove sequences from tree
             unlink "XXXtemp_tree_file.tree"; # delete tree file
             my $string = $dbh->quote($tree);
             my $changes = $dbh->do("UPDATE alignment_groups SET tree=$string WHERE taxon='$taxa' AND gene='$gene'"); # save pruned tree in database
@@ -694,7 +694,7 @@ sub remove_outliers { # sub that remove sequences that are decendents of "extrem
 sub get_outlier_length { # get branchlength that is unlikely
     my $treefile = shift @_; # get tree file
     my $path  = shift @_; # path to treebender
-    chomp(my @data = `${path}treebender -a \\\\n < $treefile`); # get branchlengths from tree
+    chomp(my @data = `${path}$External_program::treebender -a \\\\n < $treefile`); # get branchlengths from tree
     @data=sort by_number (@data); # sort the branchlengths
     sub by_number { $a <=> $b }
     while ($data[0] =~ /[^0-9\.eE-]/ or $data[0] eq '') {shift @data;} # if there are non numeric values, remove them

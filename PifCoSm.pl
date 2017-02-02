@@ -20,6 +20,7 @@ use Refine_alignment;
 use Gblocks;
 use Concatenated_tree;
 use Exclude_rogues;
+use External_program;
 
 ### Global variables ###
 my $taxon_tree=0;
@@ -881,7 +882,7 @@ for (my $i=0; $i < scalar @modules; ++$i) {
         my $switches = "--format sqlite --group both:cut-off=$cut_off_array[1]:min_length=$min_sequence_length_out";
         if ($clustered eq 'y') { $switches .= ":only_lead"; }
         if ($n_threads > 1) { $switches .= " -T $n_threads"; }
-        system "${path}pairalign -v $switches $database";
+        system "${path}$External_program::pairalign -v $switches $database";
         $clustered = 'y';
         if ($backup{"similarity_cluster"} or $backup{"all"}) {
             my $backup_name = $database . ".sim_clust";
@@ -1125,16 +1126,17 @@ sub pars_batch_file {
         $infile =~ s/([^\\]|^)#.+$/$1/;
         $infile =~ s/\\#/#/g;
         if (!($infile =~ /[a-zA-Z]/)) { next; }
-        if ($infile =~ /^\s*database\s+([\w\.]+)/i) {
+        if ($infile =~ /^\s*database\s+([\w\/\-\.\\,]+)/i) {
             $database = $1;
         }
-        elsif ($infile =~ /^\s*gb_file\s+([\/\\\w\.]+)/i) {
+        elsif ($infile =~ /^\s*gb_file\s+([\w\/\-\.\\,]+)/i) {
             $gb_data_file = $1;
+	    $gb_data_file =~ s/^\s+|\s+$//g;
         }
         elsif ($infile =~ /^\s*modules\s+([\w,]+)/i) {
             @modules = split /,/, $1;
         }
-        elsif ($infile =~ /^\s*hmm_database\s+([\w,\.]+)/i) {
+        elsif ($infile =~ /^\s*hmm_database\s+([\w\.\/\-\.\\,]+)/i) {
             $hmmdatabase = $1;
         }
         elsif ($infile =~ /^\s*print_non_match\s+(\w+)/i) {
@@ -1276,13 +1278,13 @@ sub pars_batch_file {
         elsif ($infile =~ /^\s*sequence_name_column\s+([\w,]+)/i) {
             $align_seq_name_col = $1;
         }
-        elsif ($infile =~ /^\s*out_file_name\s+([\w,]+)/i) {
+        elsif ($infile =~ /^\s*out_file_name\s+([\w,\/\-\.\\]+)/i) {
             $out_file_stem = $1;
         }
-        elsif ($infile =~ /^\s*changes_files\s+([\w,\.]+)/i) {
+        elsif ($infile =~ /^\s*changes_files\s+([\w,\.\/\-\.\\]+)/i) {
             @changes_files = split /,/,$1;
         }
-        elsif ($infile =~ /^\s*tree_file\s+([\w,]+)/i or $infile =~ /^\s*gene_tree\s+([\w,]+)/i) {
+        elsif ($infile =~ /^\s*tree_file\s+([\w,\/\-\.\\]+)/i or $infile =~ /^\s*gene_tree\s+([\w,\/\-\.\\]+)/i) {
             $tree_file = $1;
         }
         elsif ($infile =~ /^\s*tree_infile/i) {

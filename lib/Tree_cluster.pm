@@ -65,8 +65,8 @@ sub tree_cluster {
             if ($counter > 0) { print "--- Clustering $counter sequences in $taxon_strings[$k] ---\n"; }
             if ($counter > 3) { # if more than three sequences align and create phylogeny
                 # align
-                if ($n_threads > 0) { `${path}mafft --auto --quiet --thread $n_threads XXXunaligned.fst > XXXaligned.fst`; } # if using threads use PTHREAD version of mafft
-                else { `${path}mafft --auto --quiet XXXunaligned.fst > XXXaligned.fst`; } # otherwise not
+                if ($n_threads > 0) { `${path}$External_program::mafft --auto --quiet --thread $n_threads XXXunaligned.fst > XXXaligned.fst`; } # if using threads use PTHREAD version of mafft
+                else { `${path}$External_program::mafft --auto --quiet XXXunaligned.fst > XXXaligned.fst`; } # otherwise not
                 open ALIGNED, "<XXXaligned.fst" or die "Couldn't open XXXaligned.fst: $!.\n"; # file handle to read aligned sequences
                 open PHYLIP, ">XXXaligned.phy" or die "Couldn't open XXXaligned.phy: $!.\n"; # file handle to print sequences in phylip format
                 my $accno; # to store accno
@@ -93,13 +93,13 @@ sub tree_cluster {
                 close PHYLIP or die;
                 # make phylogeny
                 if (-e "RAxML_info.XXXtemp") { die "Can not run raxmlHPC since there already are files with the ending XXXtemp.\n"; } # check if files will block running RAxML
-                my $raxml = `${path}raxmlHPC -y -s XXXaligned.phy -m GTRGAMMA -n XXXtemp -p 12345`; # run parsimonator
+                my $raxml = `${path}$External_program::raxml -y -s XXXaligned.phy -m GTRGAMMA -n XXXtemp -p 12345`; # run parsimonator
                 if ( -e "RAxML_parsimonyTree.XXXtemp" ) { # if tree file from parsimonator
                     if ( $seq_sim eq 'y') {
-                        `${path}raxmlHPC -f e -s XXXaligned.phy -m GTRGAMMA -n XXXoptim -t RAxML_parsimonyTree.XXXtemp`; # optimize branchlengths on parsimony tree
+                        `${path}$External_program::raxml -f e -s XXXaligned.phy -m GTRGAMMA -n XXXoptim -t RAxML_parsimonyTree.XXXtemp`; # optimize branchlengths on parsimony tree
                         if (-e "RAxML_result.XXXoptim") {
                             print "Clustering based on similarity.\n";
-                            system "${path}treebender --cluster branch_length --cut_off $cut_off{$tables[$j]} < RAxML_result.XXXoptim > XXXclusters.txt"; # single link clustering based on branch lengths
+                            system "${path}$External_program::treebender --cluster branch_length --cut_off $cut_off{$tables[$j]} < RAxML_result.XXXoptim > XXXclusters.txt"; # single link clustering based on branch lengths
                             my $n_clusters=&process_clusters($dbh,'XXXclusters.txt',$tables[$j]); # select 'best' sequence in cluster and make changes in database
                             print "$n_clusters clusters.\n";
                             # get sequences that are still lead in clusters
@@ -111,14 +111,14 @@ sub tree_cluster {
                             #my $n_to_keep=0;
                             while (my $temp = $sth->fetchrow_array() ) { $keep .= "$temp,"; } #++$n_to_keep;} # add each lead sequence
                             $keep =~ s/,$//; # remove trailing ,
-                            system "${path}treebender -d $keep -i < RAxML_result.XXXoptim > RAxML_parsimonyTree.XXXtemp"; # remove non-leade sequences from tree
+                            system "${path}$External_program::treebender -d $keep -i < RAxML_result.XXXoptim > RAxML_parsimonyTree.XXXtemp"; # remove non-leade sequences from tree
                             unlink "XXXclusters.txt","RAxML_info.XXXoptim","RAxML_result.XXXoptim","RAxML_log.XXXoptim","RAxML_binaryModelParameters.XXXoptim","XXXaligned.phy.reduced"; # clean up
                         }
                         else { print STDERR "WARNING!!! No tree with branch lengths optimized from RAxML. Can not cluster based on similarity in tree. Continuing reluctantly...\n"; }
                     }
                     if ($species_name eq 'y') {# cluster sequences based on taxon annotation
                         print "Clustering based on species annotation.\n";
-                        system "${path}treebender --cluster database:$database,gb_data,accno,species < RAxML_parsimonyTree.XXXtemp > XXXclusters.txt"; # use it to cluster monophyletic species
+                        system "${path}$External_program::treebender --cluster database:$database,gb_data,accno,species < RAxML_parsimonyTree.XXXtemp > XXXclusters.txt"; # use it to cluster monophyletic species
                         my $n_clusters=&process_clusters($dbh,'XXXclusters.txt',$tables[$j]); # select 'best' sequence in cluster and make changes in database
                         print "$n_clusters clusters.\n";
                         unlink "XXXclusters.txt"; # clean up
@@ -172,7 +172,7 @@ sub tree_cluster {
                         if ( $seq_sim eq 'y') {
                             open SEQPAIR, ">XXXseq_pair.fst" or die "Could not open XXXseq_pair.fst: $!.\n";
                             print SEQPAIR ">$accnos[$i]\n$sequences[$i]\n>$accnos[$j]\n$sequences[$j]\n";
-                            chomp (my $JCdistance = `${path}pairalign -j < XXXseq_pair.fst`);
+                            chomp (my $JCdistance = `${path}$External_program::pairalign -j < XXXseq_pair.fst`);
                             unlink "XXXseq_pair.fst";
                             $JCdistance =~ s/[^0-9\.-]//g;
                             if ($JCdistance < $cut_off{$tables[$j]}) { ++$cluster_flag; }

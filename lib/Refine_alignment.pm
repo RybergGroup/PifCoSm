@@ -105,7 +105,7 @@ sub refine_alignment { # This module aligns the sequences similarily to SATe, it
             open TREE, ">XXXtree.tree" or die "Could not open XXXtree.tree: $!.\n";
             print TREE $tree;
             close TREE or die;
-            my @tip_names = `${path}treebender -t '\\n' < XXXtree.tree`;
+            my @tip_names = `${path}$External_program::treebender -t '\\n' < XXXtree.tree`;
             chomp(@tip_names);
             my $switch_names = '';
             foreach (@tip_names) {
@@ -125,7 +125,7 @@ sub refine_alignment { # This module aligns the sequences similarily to SATe, it
                 }
             }
             $switch_names =~ s/,$//;
-            $tree=`${path}treebender -c '$switch_names' < XXXtree.tree`;
+            $tree=`${path}$External_program::treebender -c '$switch_names' < XXXtree.tree`;
             unlink 'XXXtree.tree';
         }
         my $interleaved = 'n';
@@ -150,7 +150,7 @@ sub refine_alignment { # This module aligns the sequences similarily to SATe, it
             open TREE, ">XXXtree.tree" or die "Could not open XXXtree.tree: $!.\n";
             print TREE $tree;
             close TREE or die;
-            my @tip_names = `${path}treebender -t '\\n' < XXXtree.tree`;
+            my @tip_names = `${path}$External_program::treebender -t '\\n' < XXXtree.tree`;
             chomp(@tip_names);
             my %present_hash;
             while (@tip_names) { $present_hash{shift @tip_names} = 'n'; }
@@ -182,14 +182,14 @@ sub refine_alignment { # This module aligns the sequences similarily to SATe, it
                 print "Removing superfluous taxa.\n";
                 $drop_tips =~ s/'/\'/g;
                 $drop_tips =~ s/"/\"/g;
-                open TREE, "|${path}treebender -d '$drop_tips' > XXXtree.tree" or die "Cannot pipe to treebender: $!\n";
+                open TREE, "|${path}$External_program::treebender -d '$drop_tips' > XXXtree.tree" or die "Cannot pipe to treebender: $!\n";
                 print TREE $tree;
                 close TREE or die;
             }
             if ($need_to_add eq 'y') {
                 print "Adding missing taxa.\n";
                 unlink glob "RAxML_*.XXXtemp";
-                my @raxml = `${path}raxmlHPC -s XXXtemp.phy -m GTRGAMMA -n XXXtemp -p 54321-f p -t XXXtree.tree`;
+                my @raxml = `${path}$External_program::raxml -s XXXtemp.phy -m GTRGAMMA -n XXXtemp -p 54321-f p -t XXXtree.tree`;
                 foreach (@raxml) {
                     if ($_ =~ /Final GAMMA-based Score of best tree (-{0,1}[0-9.]+)/) {
                         $guideML = $1;
@@ -211,7 +211,7 @@ sub refine_alignment { # This module aligns the sequences similarily to SATe, it
                 print "Re-estimating branch lengths and getting ML score for guide tree.\n";
                 unlink glob "RAxML_*.XXXtemp";
                 if ($tree_method eq 'fasttree') {
-                    system `${path}FastTree -quiet -nosupport -log XXXlog.txt -nt -gtr -gamma -mllen -nome -intree XXXguide.tree XXXtemp.phy > XXXtemp.tree`;
+                    system `${path}$External_program::fasttree -quiet -nosupport -log XXXlog.txt -nt -gtr -gamma -mllen -nome -intree XXXguide.tree XXXtemp.phy > XXXtemp.tree`;
                     rename "XXXtemp.tree","XXXguide.tree";
                     open LOGFILE, "<XXXlog.txt" or die "Could not open logfile to read ML score: $!.\n";
                     while (my $row = <LOGFILE>) {
@@ -221,7 +221,7 @@ sub refine_alignment { # This module aligns the sequences similarily to SATe, it
                     unlink "XXXlog.txt";
                 }
                 else {
-                    my @raxml=`${path}raxmlHPC -f e -s XXXtemp.phy -m GTRGAMMA -n XXXtemp -t XXXguide.tree`; # optimize branchlengths on parsimony tree
+                    my @raxml=`${path}$External_program::raxml -f e -s XXXtemp.phy -m GTRGAMMA -n XXXtemp -t XXXguide.tree`; # optimize branchlengths on parsimony tree
                     foreach (@raxml) {
                         if ($_ =~ /Final GAMMA  likelihood: (-{0,1}[0-9\.]+)/) {
                             $guideML = $1;
@@ -278,7 +278,7 @@ sub refine_alignment { # This module aligns the sequences similarily to SATe, it
                     if ($n_taxa < 2) { last; } # if no or one sequence no need to align
                     $keep_tips =~ s/,$//; # get rid of last comma in keep tips, however I do not think this is nessesary
                     $split_switches = "longest_branch:n --split_stop t:2";
-                    my $pruned_tree = `${path}treebender -d $keep_tips -i < $temp_tree`;
+                    my $pruned_tree = `${path}$External_program::treebender -d $keep_tips -i < $temp_tree`;
                     &divide_and_align ($dbh,  $genes[$i], $max_size, $split_switches, 0, $use_guide_tree, $path, $pruned_tree);
                     rename "XXXalignment_0.fst", "XXXbuild_$genes[$i].fst";
                 }
@@ -491,11 +491,11 @@ sub divide_and_align {
     my $use_guide_tree = shift @_;
     my $path = shift @_;
     my $tree = \$_[0];
-    my @groups = `echo "$$tree" | ${path}treebender --split $split_switches`;
+    my @groups = `echo "$$tree" | ${path}$External_program::treebender --split $split_switches`;
     my $n_aligned=0;
     for (my $i=0; $i < scalar @groups; $i++) {
         chomp ($groups[$i]);
-        my $temp = `echo "$groups[$i]" | ${path}treebender -t`;
+        my $temp = `echo "$groups[$i]" | ${path}$External_program::treebender -t`;
         chomp ($temp); # get rid of new line
         my @tip_labels = split /,/, $temp; # separate the tip lables
         if (scalar @tip_labels < $max_size) {
@@ -519,7 +519,7 @@ sub divide_and_align {
                     close GUIDETREE or die;
                     $mafft_switches .= " --treein XXXmafft.tree";
                 }
-                system "${path}mafft $mafft_switches XXXtemp.fst > XXXalignment_$number.fst"; # align the group
+                system "${path}$External_program::mafft $mafft_switches XXXtemp.fst > XXXalignment_$number.fst"; # align the group
                 if ($use_guide_tree eq 'y' and scalar @tip_labels > 3) { unlink "XXXmafft.tree"; }
             }
             else { rename "XXXtemp.fst", "XXXalignment_$number.fst"; } # if only one sequence no need to align
@@ -530,21 +530,21 @@ sub divide_and_align {
         if ($i>0) {
             if (-e "XXXbuilt_$number.fst") {
                 if (scalar @tip_labels < 2) {
-                    system "${path}mafft --quiet --add XXXalignment_$number.fst XXXbuilt_$number.fst > XXXtemp.fst";
+                    system "${path}$External_program::mafft --quiet --add XXXalignment_$number.fst XXXbuilt_$number.fst > XXXtemp.fst";
                     rename "XXXtemp.fst", "XXXbuilt_$number.fst";
                     unlink "XXXalignment_$number.fst";
                 }
                 elsif ($n_aligned < 2) {
-                    system "${path}mafft --quiet --add XXXbuilt_$number.fst XXXalignment_$number.fst > XXXtemp.fst";
+                    system "${path}$External_program::mafft --quiet --add XXXbuilt_$number.fst XXXalignment_$number.fst > XXXtemp.fst";
                     rename "XXXtemp.fst", "XXXbuilt_$number.fst";
                     unlink "XXXalignment_$number.fst";
                 }
                 else {
                     if ($n_aligned >= scalar @tip_labels ) {
                         #system "${path}mafft --quiet --addprofile XXXalignment_$number.fst XXXbuilt_$number.fst > XXXtemp.fst"; # add sequences to previous alignment
-                        system "${path}muscle -quiet -profile -in1 XXXbuilt_$number.fst -in2 XXXalignment_$number.fst -out XXXtemp.fst"; # add sequences to previous alignment
+                        system "${path}$External_program::muscle -quiet -profile -in1 XXXbuilt_$number.fst -in2 XXXalignment_$number.fst -out XXXtemp.fst"; # add sequences to previous alignment
                     }
-                    else { system "${path}muscle -quiet -profil -in1 XXXalignment_$number.fst -in2 XXXbuilt_$number.fst -out XXXtemp.fst"; } # add sequences to previous alignment
+                    else { system "${path}$External_program::muscle -quiet -profil -in1 XXXalignment_$number.fst -in2 XXXbuilt_$number.fst -out XXXtemp.fst"; } # add sequences to previous alignment
                     #else { system "${path}mafft --quiet --addprofil XXXbuilt_$number.fst XXXalignment_$number.fst > XXXtemp.fst"; } # add sequences to previous alignment
                 }
                 rename "XXXtemp.fst", "XXXbuilt_$number.fst";

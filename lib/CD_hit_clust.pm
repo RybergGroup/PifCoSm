@@ -38,8 +38,8 @@ sub CD_hit_clust {
             $sth = $dbh->prepare("SELECT accno,sequence FROM $tables[$j] WHERE LENGTH(sequence) >= $min_length") or die;
         }
         my $n_seq = PifCosm_support_subs::print_fasta("XXX$tables[$j].fst",$sth);
-        if ($n_treads > 1) { system "${path}cdhit-est -i XXX$tables[$j].fst -o XXX$tables[$j] -c $cut_off{$tables[$j]} -T $n_treads > XXX$tables[$j].out"; }
-        else { system "${path}cdhit-est -i XXX$tables[$j].fst -o XXX$tables[$j] -c $cut_off{$tables[$j]} > XXX$tables[$j].out"; }
+        if ($n_treads > 1) { system "${path}$External_program::cd_hit_est -i XXX$tables[$j].fst -o XXX$tables[$j] -c $cut_off{$tables[$j]} -T $n_treads > XXX$tables[$j].out"; }
+        else { system "${path}$External_program::cd_hit_est -i XXX$tables[$j].fst -o XXX$tables[$j] -c $cut_off{$tables[$j]} > XXX$tables[$j].out"; }
         open CLUSTERS, "<XXX$tables[$j].clstr" or die "Could not open XXX$tables[$j].clstr: $!.\n";
         my $cluster;
         while (my $row = <CLUSTERS>) {

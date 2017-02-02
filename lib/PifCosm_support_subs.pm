@@ -217,15 +217,15 @@ sub run_raxml { # sub to run RAxML
     unlink glob "RAxML*.$run_name*"; # remove previous files with the same name
     if ($methods[0] eq 'ExaML') { # if runing ExaML
 	if ($n_threads > 0) {
-	    @raxml=`${path}raxmlHPC -y -s $phylipfile -n $run_name -m GTRGAMMA -p 12345`; # make starting tree if runing EXaml
+	    @raxml=`${path}$External_program::raxml -y -s $phylipfile -n $run_name -m GTRGAMMA -p 12345`; # make starting tree if runing EXaml
 	    #foreach (glob "*") { print "$_\n"; }
 	    if ( -e "RAxML_parsimonyTree.$run_name" ) { # if parsimony tree exists
 		rename "RAxML_parsimonyTree.$run_name","RAxML_parsimonyTree.$run_name.0";
 		unlink glob "RAxML*.$run_name"; # remove all files with the same run name
 		my @pars_out;
-		if ($partition_file ne 'n') { @pars_out = `parse-examl -s $phylipfile -m DNA -n $phylipfile -q $partition_file`; }
-		else { @pars_out = `parse-examl -s $phylipfile -m DNA -n $phylipfile`; }
-		@raxml=`mpirun.openmpi -np $n_threads ${path}examl -s $phylipfile.binary -m GAMMA -n $run_name -t RAxML_parsimonyTree.$run_name.0`; # run RAxML
+		if ($partition_file ne 'n') { @pars_out = `$External_program::parsexaml -s $phylipfile -m DNA -n $phylipfile -q $partition_file`; }
+		else { @pars_out = `$External_program::parsexaml -s $phylipfile -m DNA -n $phylipfile`; }
+		@raxml=`$External_program::openmpi $n_threads ${path}$External_program::examl -s $phylipfile.binary -m GAMMA -n $run_name -t RAxML_parsimonyTree.$run_name.0`; # run RAxML
 		foreach (@raxml) {
 		    if ($_ =~ /Likelihood\s+:\s+(-{0,1}[0-9.]+)/) {
 			$ml_score = $1;
@@ -247,7 +247,7 @@ sub run_raxml { # sub to run RAxML
 		    print STDERR "No ExaML tree. Doing ML on parsimony topology.\n";
 		    unlink glob "RAxML*.$run_name"; # remove files with same run name
 		    undef @raxml;
-		    @raxml=`${path}raxmlHPC -f e -s $phylipfile -m GTRGAMMA -n $run_name -t RAxML_parsimonyTree.$run_name.0$additional`; # optimize branchlengths on parsimony tree
+		    @raxml=`${path}$External_program::raxml -f e -s $phylipfile -m GTRGAMMA -n $run_name -t RAxML_parsimonyTree.$run_name.0$additional`; # optimize branchlengths on parsimony tree
 		    foreach (@raxml) {
 			if ($_ =~ /Final GAMMA  likelihood: (-{0,1}[0-9\.]+)/) {
 			    $ml_score = $1;
@@ -293,7 +293,7 @@ sub run_raxml { # sub to run RAxML
 	}
     }
     elsif ($methods[0] eq 'RAxML') {
-        my @raxml=`${path}raxmlHPC -f d -s $phylipfile -m GTRGAMMA -p 54321 -n $run_name$additional`;
+        my @raxml=`${path}$External_program::raxml -f d -s $phylipfile -m GTRGAMMA -p 54321 -n $run_name$additional`;
         foreach (@raxml) {
             if ($_ =~ /Final GAMMA-based Score of best tree (-{0,1}[0-9\.]+)/) {
             #if ($_ =~ /Likelihood\s+:\s+(-{0,1}[0-9.]+)/) {
@@ -316,7 +316,7 @@ sub run_raxml { # sub to run RAxML
         }
     }
     elsif ($methods[0] eq 'fasttree') {
-        system "${path}FastTree -quiet -nt -gtr -gamma -log XXXlogfile.txt < $phylipfile > XXX_ML.$run_name.tree";
+        system "${path}$External_program::fasttree -quiet -nt -gtr -gamma -log XXXlogfile.txt < $phylipfile > XXX_ML.$run_name.tree";
         if (-e "XXXlogfile.txt") {
             open LOGFILE, "<XXXlogfile.txt" or die "Could not open logfile.\n";
             while (my $row=<LOGFILE>) {
@@ -346,25 +346,25 @@ sub run_raxml { # sub to run RAxML
 	    unlink glob "RAxML*.XXXtemp";
 	    if ($partition_file eq 'n') {
 		if ($n_threads > 1) {
-		    my @raxml = `${path}raxmlHPC-PTHREADS -x 12345 -p 54321 -# $bootstraps -m GTRGAMMA -s $phylipfile -n XXXtemp -T $n_threads`;
-		    if ($ml_tree ne 'empty' and -e $ml_tree) { @raxml = `${path}raxmlHPC-PTHREADS -f b -t $ml_tree -z RAxML_bootstrap.XXXtemp -m GTRGAMMA -n XXXbipart`; }
+		    my @raxml = `${path}$External_program::raxmlPTHREADS -x 12345 -p 54321 -# $bootstraps -m GTRGAMMA -s $phylipfile -n XXXtemp -T $n_threads`;
+		    if ($ml_tree ne 'empty' and -e $ml_tree) { @raxml = `${path}$External_program::raxmlPTHREADS -f b -t $ml_tree -z RAxML_bootstrap.XXXtemp -m GTRGAMMA -n XXXbipart`; }
 		    else { print STDERR "No ML tree for $run_name to draw support values on for $run_name.\n"; }
 		}
 		else {
-		    my @raxml = `${path}raxmlHPC -x 12345 -p 54321 -# $bootstraps -m GTRGAMMA -s $phylipfile -n XXXtemp`;
-		    if ($ml_tree ne 'empty' and -e $ml_tree) { @raxml = `${path}raxmlHPC -f b -t $ml_tree -z RAxML_bootstrap.XXXtemp -m GTRGAMMA -n XXXbipart`; }
+		    my @raxml = `${path}$External_program::raxml -x 12345 -p 54321 -# $bootstraps -m GTRGAMMA -s $phylipfile -n XXXtemp`;
+		    if ($ml_tree ne 'empty' and -e $ml_tree) { @raxml = `${path}$External_program::raxml -f b -t $ml_tree -z RAxML_bootstrap.XXXtemp -m GTRGAMMA -n XXXbipart`; }
 		    else { print STDERR "No ML tree for $run_name to draw support values on for $run_name.\n"; }
 		}
 	    }
 	    else {
 		if ($n_threads > 1) {
-		    my @raxml = `${path}raxmlHPC-PTHREADS -x 12345 -p 54321 -# $bootstraps -m GTRGAMMA -s $phylipfile -q $partition_file -n XXXtemp -T $n_threads`;
-		    if ($ml_tree ne 'empty' and -e $ml_tree) { @raxml = `${path}raxmlHPC-PTHREADS -f b -t $ml_tree -z RAxML_bootstrap.XXXtemp -m GTRGAMMA -n XXXbipart -T $n_threads`; }
+		    my @raxml = `${path}$External_program::raxmlPTHREADS -x 12345 -p 54321 -# $bootstraps -m GTRGAMMA -s $phylipfile -q $partition_file -n XXXtemp -T $n_threads`;
+		    if ($ml_tree ne 'empty' and -e $ml_tree) { @raxml = `${path}$External_program::raxmlPTHREADS -f b -t $ml_tree -z RAxML_bootstrap.XXXtemp -m GTRGAMMA -n XXXbipart -T $n_threads`; }
 		    else { print STDERR "No ML tree for $run_name to draw support values on for $run_name.\n"; }
 		}
 		else {
-		    my @raxml = `${path}raxmlHPC -x 12345 -p 54321 -# $bootstraps -m GTRGAMMA -s $phylipfile -q $partition_file -n XXXtemp`;
-		    if ($ml_tree ne 'empty' and -e $ml_tree) { @raxml = `${path}raxmlHPC -f b -t $ml_tree -z RAxML_bootstrap.XXXtemp -m GTRGAMMA -n XXXbipart`; }
+		    my @raxml = `${path}$External_program::raxml -x 12345 -p 54321 -# $bootstraps -m GTRGAMMA -s $phylipfile -q $partition_file -n XXXtemp`;
+		    if ($ml_tree ne 'empty' and -e $ml_tree) { @raxml = `${path}$External_program::raxml -f b -t $ml_tree -z RAxML_bootstrap.XXXtemp -m GTRGAMMA -n XXXbipart`; }
 		    else { print STDERR "No ML tree for $run_name to draw support values on for $run_name.\n"; }
 		}
 	    }
@@ -377,13 +377,21 @@ sub run_raxml { # sub to run RAxML
 		rename 'RAxML_bootstrap.XXXtemp', "XXX_boot.$run_name.trees";
 		$boottree_file = "XXX_boot.$run_name.trees";
 	    }
+	    else {
+		print STDERR "Failed to do bootstrap in RAxML. Continuing reluctantly...\n";
+	    }
 	    unlink glob "RAxML*.XXXtemp";
 	    unlink glob "RAxML*.XXXbipart"
 	}
 	elsif ($methods[0] eq 'fasttree') {
-	    system "${path}FastTree -quiet -nt -gtr -gamma -noml -boot $bootstraps -intree $ml_tree < $phylipfile > XXXtemp.tree";
-	    rename "XXXtemp.tree","XXX_ML.$run_name.tree";
-	    $ml_tree = "XXX_ML.$run_name.tree";
+	    system "${path}$External_program::fasttree -quiet -nt -gtr -gamma -noml -boot $bootstraps -intree $ml_tree < $phylipfile > XXXtemp.tree";
+	    if (-e 'XXXtemp.tree') {
+		rename "XXXtemp.tree","XXX_ML.$run_name.tree";
+		$ml_tree = "XXX_ML.$run_name.tree";
+	    }
+	    else {
+		print STDERR "Failed to do bootstrap in FastTree. Continuing reluctantly...\n";
+	    }
 	}
 	else { print STDERR "Did not recognize method for bootstrap analysis. No bootstrap support generated.\n"; }
     }
@@ -548,13 +556,13 @@ sub comp_distance { # subroutine to compare the distances between pairs of seque
     print FASTAFILE $fasta1;
     close FASTAFILE or die;
     # get distances between sequences for first gene
-    my @distances1 = `${path}pairalign -j < XXXtemp_pair.fst`;
+    my @distances1 = `${path}$External_program::pairalign -j < XXXtemp_pair.fst`;
     # write sequences for second gene
     open FASTAFILE, ">XXXtemp_pair.fst" or die "Could not open XXXtemp_pair.fst: $!.\n";
     print FASTAFILE $fasta2;
     close FASTAFILE or die;
     # get distances between sequences for second gene
-    my @distances2 = `${path}pairalign -j < XXXtemp_pair.fst`;
+    my @distances2 = `${path}$External_program::pairalign -j < XXXtemp_pair.fst`;
     unlink "XXXtemp_pair.fst"; # delete sequence file
     if (scalar @distances1 != scalar @distances2) { return (undef,undef); } # if diferent number of comparisons within each gene return undef
     else { # if OK
@@ -973,7 +981,7 @@ sub change_names {
     }
     else { print "Getting tree from $tree.\n"; }
     if (-e $tree) {
-        my @tip_lables = `${path}treebender -t '\\n' < $tree`;
+        my @tip_lables = `${path}$External_program::treebender -t '\\n' < $tree`;
         chomp (@tip_lables);
         if (scalar @tip_lables > 1) {
             my $n_accno=0;
@@ -1010,7 +1018,7 @@ sub change_names {
                 }
             }
             if ($switch_statement =~ s/,$//) {
-                system "${path}treebender -c \"$switch_statement\" < $tree > $file_stem.switched_names.tree";
+                system "${path}$External_program::treebender -c \"$switch_statement\" < $tree > $file_stem.switched_names.tree";
                 if (-e 'XXXtemp.tree') { unlink 'XXXtemp.tree'; }
                 if (-e "$file_stem.switched_names.tree") { return "$file_stem.switched_names.tree"; }
                 else { print "No tree file with new names created.\n"; return 'No'; }
@@ -1465,7 +1473,7 @@ sub alignment_stats { ### Sub to calculate some statistics for the alignments
             $total+=$seq_not_lead{$_};
         }
         print "The total number of non-lead sequences is $total\n";
-        my @decisiveness=`${path}contree -D "$gene_taxa_string" -i 1000`;
+        my @decisiveness=`${path}$External_program::contree -D "$gene_taxa_string" -i 1000`;
         print @decisiveness;
     }
     else { print STDERR "WARNING!!! No alignments table present, no statistics created.\n"; }
