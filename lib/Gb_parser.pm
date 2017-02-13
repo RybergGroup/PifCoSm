@@ -139,7 +139,7 @@ sub gb_parser {
         }
         elsif ( $infile =~ /^\s*ORGANISM\s+(.+)/ ) {
             $species = $1;
-	    $species =~ s/ var\.|f\.|ssp. \w+$//;
+	    $species =~ s/ (var\.|f\.|ssp.) \w+$//;
             $field_flag = 'organism';
             next;
         }

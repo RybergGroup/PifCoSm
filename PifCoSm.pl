@@ -88,7 +88,7 @@ my $remove_from_trees = 'n';
 my $remove_from_alignment = 'n';
 
 # variables for change_entries
-my $remove_entries = 'n';
+my $change_option = 'c';
 
 my $stats_type = 'alignment';
 ########################
@@ -310,11 +310,13 @@ my $stats_type = 'alignment';
             }
             else { $rm_outliers = 'y'; }
         }
-        elsif ($ARGV[$i] eq "-rm" or $ARGV[$i] eq "--remove_entries") {
+        elsif ($ARGV[$i] eq "-ch" or $ARGV[$i] eq "--change_option") {
             if (($i+1) < scalar @ARGV and !($ARGV[$i+1] =~ /^-/)) {
                 ++$i;
-                if ($ARGV[$i] =~ /^y/i) { $remove_entries = 'y'; }
-                elsif ($ARGV[$i] =~ /^n/i) { $remove_entries = 'n'; }
+                if ($ARGV[$i] =~ /^remove$/i || $ARGV[$i] =~ /^rm$/i) { $change_option = 'r'; }
+                elsif ($ARGV[$i] =~ /^change$/i) { $change_option = 'c'; }
+		elsif ($ARGV[$i] =~ /^update$/i) { $change_option = 'u'; }
+		else { die "Unknown option $ARGV[$i] to -ch/--change_option.\n"; }
             }
             else { $rm_outliers = 'y'; }
         }
@@ -451,8 +453,8 @@ my $stats_type = 'alignment';
                     $dbh->disconnect();
                     $gb_data_check = 'y';
                 }
-		if ($modules[$i] eq "check_taxonomy") { }
-                if ($modules[$i] eq "change_entries") {
+		if ($modules[$i] eq "check_taxonomy") { $run_module{"check_taxonomy"} = 'y'; }
+                elsif ($modules[$i] eq "change_entries") {
                     $run_module{"change_entries"} = 'y';
                     if (@changes_files) {
                         foreach (@changes_files) { if (!(-e $_)) { die "Could not find the file $_ for the change_entries module. Quitting.\n"; } }
@@ -664,8 +666,8 @@ my $stats_type = 'alignment';
                         if (!$gene or $gene ne 'combined_boot') { die "Could not find bootstrap trees. The exclude_rogues module need bootstrap trees. You need to save the bootstrap trees when running the catenate_tree module.\n"; }
                     }
                 }
-                elsif ($modules[$i] eq "get_distinct_entries") {
-                    $run_module{"get_distinct_entries"} = 'y';
+                elsif ($modules[$i] eq "get_distinct_entries" || $modules[$i] eq "get_shared_values") {
+                    #$run_module{"get_distinct_entries"} = 'y';
                     if (!$run_module{"gb_parser"}) {
                         my $dbh = PifCosm_support_subs::connect_to_database ($database);
                         foreach (@column_name) { if (PifCosm_support_subs::column_present ($dbh,"gb_data",$_) ne 'y') { die "Column $_ not present in table gb_data in $database. Try other column (-U/--column_name).\n" } }
@@ -771,7 +773,7 @@ for (my $i=0; $i < scalar @modules; ++$i) {
     }
     elsif ($modules[$i] eq "change_entries") {
         &print_module_title ("Changing entries in table gb_data.");
-        PifCosm_support_subs::change_entries ($database, $remove_entries, @changes_files );
+        PifCosm_support_subs::change_entries ($database, $change_option, @changes_files );
         if ($backup{"change_entries"} or $backup{"all"}) {
             my $backup_name = $database . ".change";
             my $counter = 0;
@@ -1055,6 +1057,11 @@ for (my $i=0; $i < scalar @modules; ++$i) {
         &print_module_title ("Outputting distinct entries from table gb_data.");
         PifCosm_support_subs::get_distinct_entries ($database, $out_file_stem, @column_name );
     }
+    elsif ($modules[$i] eq "get_shared_values") {
+	&print_module_title ("Comparing columns for shared values.");
+	print "Checking @column_name.\n";
+	PifCosm_support_subs::get_shared_values ($database,$out_file_stem,@column_name);
+    }
     elsif ($modules[$i] eq 'get_alignments') {
         &print_module_title ("Outputting alignment.");
         my @genes;
@@ -1325,10 +1332,11 @@ sub pars_batch_file {
             elsif ($argument =~ /^n/i) { $print_taxa = 'n'; }
             else { die "Invalid argument given for print_rogues, the alternatives are y/yes/n/no.\n"; }
         }
-        elsif ($infile =~ /^\s*remove_entries\s+(\S+)/i) {
-            if ($1 =~ /^y/i) { $remove_entries = 'y'; }
-            elsif ($1 =~ /^n/i) { $remove_entries = 'n'; }
-            else { die "Invalid argument given for remove_entries, the alternatives are y/yes/n/no.\n"; }
+        elsif ($infile =~ /^\s*change_option\s+(\S+)/i) {
+	    if ($1 =~ /^remove$/i || $1 =~ /^rm$/i) { $change_option = 'y'; }
+	    elsif ($1 =~ /^change$/i) { $change_option = 'n'; }
+    	    elsif ($1 =~ /^update$/i) { $change_option = 'u'; }
+            else { die "Invalid argument given for change_option, the alternatives are y/yes/n/no.\n"; }
         }
 
         elsif ($infile =~ /^\s*print_rogues/i) { $print_taxa = 'y'; }
@@ -1405,7 +1413,12 @@ sub print_batch_file_sub {
     if ($output_tree) { print BATCHFILE "output_no_rogues_tree $output_tree\n"; }
     if ($remove_from_trees) { print BATCHFILE "rm_rogues_from_ml_tree $remove_from_trees\n"; }
     if ($remove_from_alignment) { print BATCHFILE "rm_rogues_from_alignment $remove_from_alignment\n"; }
-    if ($remove_entries) { print BATCHFILE "remove_entries $remove_entries"; }
+    if ($change_option) {
+	print BATCHFILE "change_option ";
+	if ($change_option eq 'y') { print BATCHFILE 'remove'; }
+	elsif ($change_option eq 'n') { print BATCHFILE 'change'; }
+	elsif ($change_option eq 'u') { print BATCHFILE 'update'; }
+    }
     if ($final_tree_method) { print BATCHFILE "concat_phylo_method $final_tree_method\n"; }
     if ($max_size) { print BATCHFILE "max_alignment_group_size $max_size\n"; }
     if ($use_guide_tree) { print BATCHFILE "use_guide_tree $use_guide_tree\n"; }

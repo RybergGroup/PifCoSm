@@ -232,16 +232,8 @@ sub run_raxml { # sub to run RAxML
 		    }
 		}
 		if ( -e "ExaML_result.$run_name" ) { # if a tree file is found
-		    #unlink "RAxML_parsimonyTree.$run_name.0"; # delete parsimony tree
-		    #unlink glob "ExaML_binaryCheckpoint.$run_name\_*"; # remove checkpoint files
-		    #unlink "ExaML_info.$run_name"; # remove info file
-		    #unlink "ExaML_modelFile.$run_name"; # remove log file
-		    #unlink "$phylipfile.reduced";
 		    rename "ExaML_result.$run_name", "XXX_ML.$run_name.tree"; # Change name so it is easy to delete all generated files
 		    $ml_tree = "XXX_ML.$run_name.tree";
-		    #unlink (glob "RAxML_*.$run_name*");
-		    #unlink (glob "ExaML_*.$run_name*");
-		    #return "RAxML_result.$run_name",$ml_score; # return tree file
 		}
 		elsif ($methods[1] and $methods[1] eq 'RAx-br') { # if ExaML fail to produce a tree
 		    print STDERR "No ExaML tree. Doing ML on parsimony topology.\n";
@@ -255,21 +247,8 @@ sub run_raxml { # sub to run RAxML
 		    }
 		    rename "RAxML_result.$run_name","XXX_ML.$run_name.tree";
 		    $ml_tree = "XXX_ML.$run_name.tree";
-		#    unlink glob "RAxML_*.$run_name*"; # remove file for model parameters
-		#    unlink "$phylipfile.reduced";
 		}
-		#if ( $ml_tree eq 'empty' && -e "RAxML_result.$run_name" ) { # if tree file produced
-		#    rename "RAxML_result.$run_name", "XXX_ML.$run_name.tree";
-                #    $ml_tree = "XXX_ML.$run_name.tree";
-		    #unlink "RAxML_parsimonyTree.$run_name.0"; # remove parsimony tree file
-		    #unlink "RAxML_info.$run_name"; # remove info file
-		    #unlink "RAxML_log.$run_name"; # remove log file
-		#    unlink "RAxML_*.$run_name*";
-		#    unlink "$phylipfile.reduced";
-		    #return "RAxML_result.$run_name",$ml_score; # return tree file
-		#}
-		#else
-	       if ($ml_tree eq 'empty') { # if RAxML failed totaly return parsimony tree
+		if ($ml_tree eq 'empty') { # if RAxML failed totaly return parsimony tree
 		    print STDERR "No ML tree, returning parsimony tree.\n";
 		    foreach (@raxml) { print $_; }
 		    #return "RAxML_parsimonyTree.$run_name.0",$ml_score;
@@ -293,7 +272,11 @@ sub run_raxml { # sub to run RAxML
 	}
     }
     elsif ($methods[0] eq 'RAxML') {
-        my @raxml=`${path}$External_program::raxml -f d -s $phylipfile -m GTRGAMMA -p 54321 -n $run_name$additional`;
+	my @raxml = '';
+	if ($n_threads > 1) {
+	    my @raxml = `${path}$External_program::raxmlPTHREADS -T $n_threads -f d -s $phylipfile -m GTRGAMMA -p 54321 -n $run_name$additional`;
+	}
+        else { @raxml=`${path}$External_program::raxml -f d -s $phylipfile -m GTRGAMMA -p 54321 -n $run_name$additional`; }
         foreach (@raxml) {
             if ($_ =~ /Final GAMMA-based Score of best tree (-{0,1}[0-9\.]+)/) {
             #if ($_ =~ /Likelihood\s+:\s+(-{0,1}[0-9.]+)/) {
@@ -1055,14 +1038,38 @@ sub get_distinct_entries {
     }
     $dbh->disconnect();
 }
-
+sub get_shared_values {
+    my $database = shift;
+    my $dbh = &connect_to_database ( $database );
+    my $out_file_stem = shift;
+    my @comp_columns = @_;
+    for (my $i = 0; $i < scalar @comp_columns; ++$i) {
+	for (my $j = 0; $j < scalar @comp_columns; ++$j) {
+	    if ($j != $i) {
+		print "Checking for accnos where the $comp_columns[$i] annotation is also present as $comp_columns[$j] annotation.\n";
+		open OUTPUT,'>',"$out_file_stem\_$comp_columns[$i]_$comp_columns[$j].txt" or die "Could not open $out_file_stem\_$comp_columns[$i]_$comp_columns[$j].txt: $!.\n";
+		print OUTPUT "accno\t$comp_columns[$i]\t$comp_columns[$j]\n";
+		my $sth = $dbh->prepare("SELECT accno,$comp_columns[$i],$comp_columns[$j] FROM gb_data WHERE $comp_columns[$i] IN (SELECT $comp_columns[$j] FROM gb_data WHERE $comp_columns[$j] != 'empty')") or die;
+		#"SELECT accno,voucher,strain FROM gb_data WHERE gb_data.strain IN (SELECT gb_data.voucher FROM gb_data WHERE voucher != 'empty');"
+		$sth->execute();
+		while (my @row=$sth->fetchrow_array()) {
+		    print OUTPUT "$row[0]\t$row[1]\t$row[2]\n";
+		}
+		close OUTPUT;
+		$sth->finish();
+		print "Output printed to $out_file_stem\_$comp_columns[$i]_$comp_columns[$j].txt.\n";
+	    }
+	}
+    }
+    $dbh->disconnect();
+}
 sub change_entries {
     my $database = shift @_;
-    my $rm_entries = shift @_;
+    my $option = shift @_;
     my $dbh = &connect_to_database ($database);
     my $updates=0;
     foreach (@_) { # treat rest of arguments as file names
-        if ($rm_entries ne 'y') { print "Making changes given in $_.\n"; }
+        if ($option ne 'r') { print "Making changes given in $_.\n"; }
         else { print "Removing sequences matching entries given in $_.\n" }
         my $local_updates=0;
         my $i=0;
@@ -1080,7 +1087,29 @@ sub change_entries {
             else {
                 my $col=0;
                 my @temp = split /\t/, $row;
-                if ($rm_entries ne 'y') {
+                if ($option eq 'r') {
+                    my $string='';
+                    for (my $j=0; $j<scalar @columns; ++$j) {
+                        if ($j>=scalar @temp) { last; }
+                        if ($j == 0) { $string="$columns[$j]=" . $dbh->quote($temp[$j]); }
+                        else { $string=" AND $columns[$j]=" . $dbh->quote($temp[$j]); }
+                    }
+                    my $n=$dbh->do("DELETE FROM gb_data WHERE $string") or die;
+                    if ($n <1) { print STDERR "WARNING no sequences were deleted where $string.\n"; }
+                    else { $local_updates += $n; }
+                }
+		elsif ($option eq 'u') {
+		    my $string='UPDATE gb_data SET ';
+		    for (my $j=1; $j<scalar @columns; ++$j) {
+			if ($j==1) { $string .= "$columns[$j]=" .  $dbh->quote($temp[$j]); }
+			else { $string .= ",$columns[$j]=" .  $dbh->quote($temp[$j]); }
+		    }
+		    $string .= " WHERE $columns[0]=" . $dbh->quote($temp[0]);
+		    my $n=$dbh->do($string) or die;
+                    if ($n <1) { print STDERR "WARNING no sequences were updated for $columns[0] == $temp[0].\n"; }
+                    else { $local_updates += $n; }
+		}
+                else {
                     for (my $j=0; $j<((scalar @temp) -1); $j+=2) {
                         my $string1 = $dbh->quote($temp[$j+1]);
                         my $string2 = $dbh->quote($temp[$j]);
@@ -1090,27 +1119,16 @@ sub change_entries {
                         else { $local_updates += $n; }
                     }
                 }
-                else {
-                    my $string='';
-                    for (my $j=0; $j<scalar @columns; ++$j) {
-                        if ($j>=scalar @temp) { last; }
-                        if ($j == 0) { $string="$columns[$j]=" . $dbh->quote($temp[$j]); }
-                        else { $string=" AND $columns[$j]=" . $dbh->quote($temp[$j]); }
-                    }
-                    my $n=$dbh->do("DELETE FROM gb_data WHERE $string") or die;
-                    if ($n <1) { print STDERR "WARNING sequences were deleted where $string.\n"; }
-                    else { $local_updates += $n; }
-                }
             }
             ++$i;
         }
         close INFILE or die;
-        if ($rm_entries ne 'y') { print "Made $local_updates updates.\n"; }
+        if ($option ne 'r') { print "Made $local_updates updates.\n"; }
         else { print "Deleted $local_updates rows.\n"; }
         $updates += $local_updates;
     }
     $dbh->disconnect();
-    if ($rm_entries ne 'y') { print "In total $updates updates were done.\n"; }
+    if ($option ne 'r') { print "In total $updates updates were done.\n"; }
     else { print "In total $updates rows were deleted.\n"; }
 }
 
