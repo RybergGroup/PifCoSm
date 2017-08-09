@@ -1498,4 +1498,65 @@ sub alignment_stats { ### Sub to calculate some statistics for the alignments
 
 }
 
+#############################################
+### Functions to get the taxonomy of OTUs ###
+#############################################
+
+sub getOTUtaxonomy {
+    my $output = shift;
+    my $database = shift;
+    my $names = shift;
+    my $anchor_gene = shift;
+
+    my $dbh = PifCosm_support_subs::connect_to_database ( $database ); # database handler
+
+    my @genes;
+    while (@_) { unshift @genes, shift @_; }
+    if ($genes[0] eq 'all') { @genes = PifCosm_support_subs::get_gene_tables($dbh); } # if all genes should be used get them
+
+    my $query = "SELECT $names";
+    for (my $i=0; $i < scalar @genes; ++$i) {
+        $query .= ", $genes[$i]_accno";
+    }
+    $query .= " from alignments";
+    if ($anchor_gene ne 'n') { $query .= " where $anchor_gene\_accno != 'empty'"; }
+    my %taxa;
+    
+    my $sth = $dbh->prepare($query);    
+    $sth->execute();
+    while (my @row = $sth->fetchrow_array()) { # get all accnos for each taxon
+        my $name = shift @row;
+        $taxa{$name} = [];
+        foreach my $accno (@row) { if ($accno && $accno ne 'empty') { push @{$taxa{$name}}, $accno; } } # save accnos if there is any
+    }               
+    $sth->finish();
+    $query = "SELECT taxon_string FROM gb_data WHERE accno=?";
+    $sth = $dbh->prepare($query);
+    foreach my $OTU (keys %taxa) { # for each taxon
+        print $output $OTU;
+        my @taxon;
+        for (my $i=0; $i < @{$taxa{$OTU}}; ++$i) { 
+            $sth->execute($taxa{$OTU}->[$i]); # get taxon string
+            my $taxon_string = $sth->fetchrow_array();
+            my @taxon_accno = split /\s*;\s*/, $taxon_string;
+            if (@taxon) {
+                my @temp = @taxon;
+                undef @taxon;
+                my $length = 0;
+                if (scalar @taxon_accno < scalar @temp) { $length = scalar @taxon_accno; }
+                else { $length = scalar @temp }
+                for (my $i = 0; $i < $length; ++$i) {
+                    if ($temp[$i] eq $taxon_accno[$i]) { push @taxon, $temp[$i]; }
+                    else { last; }
+                }
+            }
+            else { @taxon = @taxon_accno; }
+        }
+        print $output "\t", join ("\t",@taxon), "\n";
+    }
+    $sth->finish();
+    $dbh->disconnect();
+}   
+
+
 1;

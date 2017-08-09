@@ -554,7 +554,7 @@ my $stats_type = 'alignment';
                 elsif ($modules[$i] eq "latin_names" or $modules[$i] eq "align_sequences" or $modules[$i] eq "refine_alignments" or $modules[$i] eq "concatenated_tree" or $modules[$i] eq "get_alignments" or $modules[$i] eq "gblocks") {
                     if (!($run_module{"link_genes"} or $run_module{"multimotu"})) {
                         my $dbh = PifCosm_support_subs::connect_to_database ($database);
-                        if (PifCosm_support_subs::table_present($dbh,'alignments') eq 'n') { die "There must be a table alignments in $database or you must run the module link_genes before any of the module latin_names, align_sequences, refine_alignments, concatenated_tree, and get_alignments.\n"; }
+                        if (PifCosm_support_subs::table_present($dbh,'alignments') eq 'n') { die "There must be a table alignments in $database or you must run the module link_genes before any of the module latin_names, align_sequences, refine_alignments, concatenated_tree, get_otu_taxonomy, and get_alignments.\n"; }
                         $dbh->disconnect();
                     }
                     if ($modules[$i] eq "align_sequences") {
@@ -641,6 +641,22 @@ my $stats_type = 'alignment';
                             }
                         }
                     }
+		    if ($modules[$i] eq "get_otu_taxonomy") {
+			$run_module{"get_otu_taxonomy"} = 'y';
+			if (!$run_module{"link_genes"}) {
+                            my $dbh = PifCosm_support_subs::connect_to_database ($database);
+                            if (PifCosm_support_subs::column_present ($dbh,"alignments",$align_seq_name_col) ne 'y') { die "Could not find $align_seq_name_col as column name in table alignments in $database (-S/--sequence_name_column).\n" }
+                            if ($anchor_gene ne 'n') { foreach (split /,/, $anchor_gene) { if (PifCosm_support_subs::column_present ($dbh,"alignments","$_\_sequence") ne 'y') { die "Could not find $_\_sequence as column name in table alignments in $database.\n" } } }
+                            $dbh->disconnect();
+                        }
+			if (!($gene_alignments[0] eq 'all' or $gene_alignments[0] =~ /^max_block_[0-9]+/)) {
+                            if (!$run_module{"gene_parser"}) {
+                                my $dbh = PifCosm_support_subs::connect_to_database ($database);
+                                foreach (@gene_alignments) { if (PifCosm_support_subs::table_present($dbh,$_) ne 'y') { die "The gene $_ is not present in $database and can not be used, remove or give other gene to use (-u/--use_genes).\n"; }}
+                                $dbh->disconnect();
+                            }
+                        }
+		    }
                 }
                 elsif ($modules[$i] eq "exclude_rogues") {
                     $run_module{"exclude_rogues"} = 'y';
@@ -1070,6 +1086,15 @@ for (my $i=0; $i < scalar @modules; ++$i) {
         }
         else { @genes = @gene_alignments; }
         PifCosm_support_subs::print_alignment($database,$alignment_format,$get_partitions,$out_file_stem,$align_seq_name_col,$interleaved,$bases_per_row,$anchor_gene,@genes);
+    }
+    elsif ($modules[$i] eq 'get_otu_taxonomy') {
+	&print_module_title ("Getting OTU taxonomy");
+	my @genes;
+        if ( $gene_alignments[0] =~ /max_block_([0-9]+)/ ) {
+            @genes = PifCosm_support_subs::find_lardgest_block($database, $1);
+        }
+        else { @genes = @gene_alignments; }
+	PifCosm_support_subs::getOTUtaxonomy(*STDOUT,$database,$align_seq_name_col,$anchor_gene,@genes);
     }
     elsif ($modules[$i] eq 'get_trees') {
         &print_module_title ("Outputting trees.");
