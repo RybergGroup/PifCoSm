@@ -298,7 +298,7 @@ my $stats_type = 'alignment';
 ######################
 ### Parsing arguments ###
 {
-    if (scalar @ARGV eq 0) {
+    if (scalar @ARGV == 0) {
         print $usage;
         exit;
     }
